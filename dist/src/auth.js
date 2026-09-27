@@ -1,17 +1,17 @@
-// Shared Meta device-login logic (no third-party CLI).
+// Meta device-login transport (no third-party CLI).
 // Flow parameters are compatible with the published behavior of oh-my-pi
 // (MIT-licensed; see NOTICE).
-import { homedir } from "node:os";
-import { join, dirname } from "node:path";
+//
+// This module performs network requests but never reads the environment:
+// credential sources (env names, cache paths) live in config.ts and are
+// passed in explicitly by callers.
+import { dirname } from "node:path";
 import { readFileSync } from "node:fs";
 import { readFile, writeFile, mkdir, chmod } from "node:fs/promises";
 export const CLIENT_ID = "1031625952748946";
 export const DEVICE_URL = "https://auth.meta.com/oidc/device/authorization/";
 export const TOKEN_URL = "https://auth.meta.com/oidc/device/token/";
 export const KEY_URL = "https://api.meta.ai/muse-code/key";
-export const ENV_VAR = "MUSE_CODE_SUB_TOKEN";
-export const CREDENTIALS_ENV_VAR = "MUSE_CODE_SUB_CREDENTIALS";
-export const CREDENTIALS_FILENAME = "muse-code-sub.json";
 const HEADERS = {
     Accept: "application/json",
     "x-api-version": "1.0.0",
@@ -19,13 +19,7 @@ const HEADERS = {
 const REQUEST_TIMEOUT_MS = 25_000;
 const MIN_INTERVAL_S = 1;
 const SLOW_DOWN_STEP_S = 5;
-export function defaultCachePath() {
-    const override = (process.env[CREDENTIALS_ENV_VAR] || "").trim();
-    if (override)
-        return override;
-    return join(homedir(), ".openclaw", CREDENTIALS_FILENAME);
-}
-export async function readCache(path = defaultCachePath()) {
+export async function readCache(path) {
     try {
         const blob = (await readFile(path, "utf8").then(JSON.parse));
         return typeof blob?.apiKey === "string" && blob.apiKey.trim() ? blob.apiKey.trim() : "";
@@ -35,7 +29,7 @@ export async function readCache(path = defaultCachePath()) {
     }
 }
 /** Sync cache read for module-load key resolution (silent miss on any failure). */
-export function readCacheSync(path = defaultCachePath()) {
+export function readCacheSync(path) {
     try {
         const blob = JSON.parse(readFileSync(path, "utf8"));
         return typeof blob?.apiKey === "string" && blob.apiKey.trim() ? blob.apiKey.trim() : "";
@@ -44,9 +38,14 @@ export function readCacheSync(path = defaultCachePath()) {
         return "";
     }
 }
-export async function writeCache(credentials, path = defaultCachePath()) {
+export async function writeCache(credentials, path) {
+    // Retention minimization: persist only what inference needs. The OAuth
+    // access token has unknown broader scope and nothing reads it back, so it
+    // must never touch disk — sanitize at the sink, whatever callers pass in.
+    const { apiKey, accountId, email } = credentials;
+    const cached = { apiKey, accountId, ...(email ? { email } : {}) };
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, JSON.stringify(credentials, null, 2));
+    await writeFile(path, JSON.stringify(cached, null, 2));
     try {
         await chmod(path, 0o600);
     }

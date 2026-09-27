@@ -13,8 +13,8 @@ import {
   pollToken,
   mintKey,
   writeCache,
-  defaultCachePath,
-} from "../dist/auth.js";
+} from "../dist/src/auth.js";
+import { defaultCachePath } from "../dist/src/config.js";
 
 const args = process.argv.slice(2);
 let cache = null;
