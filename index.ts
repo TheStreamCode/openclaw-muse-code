@@ -23,13 +23,13 @@ import type {
   ModelProviderConfig,
 } from "openclaw/plugin-sdk/provider-model-types";
 import type { ProviderRuntimeModel } from "openclaw/plugin-sdk/plugin-entry";
-import { ENV_VAR, defaultCachePath, explicitToken } from "./src/config.js";
-import { readCacheSync } from "./src/auth.js";
+import { ENV_VAR } from "./src/config.js";
+import { getLiveModelIdsCached, resolveKey } from "./src/catalog.js";
 import { museCodeBaselineModels } from "./src/baseline.models.js";
 
 // Resolution order: explicit env wins, else the login cache. Silent miss.
-if (!explicitToken()) {
-  const cached = readCacheSync(defaultCachePath());
+if (!process.env[ENV_VAR]?.trim()) {
+  const cached = resolveKey();
   if (cached) process.env[ENV_VAR] = cached;
 }
 
@@ -96,10 +96,9 @@ export function projectModel(row: MuseCodeModelRow): ModelDefinitionConfig | nul
 }
 
 /**
- * Builds the provider config from the static Muse Spark baseline.
- * Used for both live and static discovery (the family has no public
- * unauthenticated catalog endpoint, so both surfaces share one builder —
- * same approach as the official Meta provider).
+ * Builds a provider config from model rows (live ids or static baseline).
+ * Live rows carry ids only, so names default to the id and the context
+ * window to the family default; inference is unaffected.
  */
 export function providerFromRows(rows: MuseCodeModelRow[]): ModelProviderConfig {
   const models = rows
@@ -114,6 +113,15 @@ export function providerFromRows(rows: MuseCodeModelRow[]): ModelProviderConfig 
 }
 
 async function buildProvider(): Promise<ModelProviderConfig> {
+  // Live first (TTL-cached, key re-resolved per call so no gateway restart
+  // is needed after the first login), static baseline as fallback.
+  const key = resolveKey();
+  if (key) {
+    const live = await getLiveModelIdsCached(META_BASE_URL, key).catch(() => null);
+    if (live && live.length > 0) {
+      return providerFromRows(live.map((id) => ({ id })));
+    }
+  }
   return providerFromRows(museCodeBaselineModels);
 }
 
