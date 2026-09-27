@@ -1,9 +1,12 @@
-// Shared Meta device-login logic (no third-party CLI).
+// Meta device-login transport (no third-party CLI).
 // Flow parameters are compatible with the published behavior of oh-my-pi
 // (MIT-licensed; see NOTICE).
+//
+// This module performs network requests but never reads the environment:
+// credential sources (env names, cache paths) live in config.ts and are
+// passed in explicitly by callers.
 
-import { homedir } from "node:os"
-import { join, dirname } from "node:path"
+import { dirname } from "node:path"
 import { readFileSync } from "node:fs"
 import { readFile, writeFile, mkdir, chmod } from "node:fs/promises"
 
@@ -11,9 +14,6 @@ export const CLIENT_ID = "1031625952748946"
 export const DEVICE_URL = "https://auth.meta.com/oidc/device/authorization/"
 export const TOKEN_URL = "https://auth.meta.com/oidc/device/token/"
 export const KEY_URL = "https://api.meta.ai/muse-code/key"
-export const ENV_VAR = "MUSE_CODE_SUB_TOKEN"
-export const CREDENTIALS_ENV_VAR = "MUSE_CODE_SUB_CREDENTIALS"
-export const CREDENTIALS_FILENAME = "muse-code-sub.json"
 
 const HEADERS: Record<string, string> = {
   Accept: "application/json",
@@ -33,7 +33,15 @@ export interface DeviceAuthorization {
 }
 
 export interface MintedCredential {
+  // In-memory only: writeCache never persists the OAuth token (see below).
   oauthAccessToken: string
+  apiKey: string
+  accountId: string
+  email?: string
+}
+
+/** The only fields ever written to the credential cache. */
+export interface CachedCredential {
   apiKey: string
   accountId: string
   email?: string
@@ -64,15 +72,9 @@ type KeyResponse = {
   user_id?: unknown
 }
 
-export function defaultCachePath(): string {
-  const override = (process.env[CREDENTIALS_ENV_VAR] || "").trim()
-  if (override) return override
-  return join(homedir(), ".openclaw", CREDENTIALS_FILENAME)
-}
-
-export async function readCache(path: string = defaultCachePath()): Promise<string> {
+export async function readCache(path: string): Promise<string> {
   try {
-    const blob = (await readFile(path, "utf8").then(JSON.parse)) as Partial<MintedCredential>
+    const blob = (await readFile(path, "utf8").then(JSON.parse)) as Partial<CachedCredential>
     return typeof blob?.apiKey === "string" && blob.apiKey.trim() ? blob.apiKey.trim() : ""
   } catch {
     return ""
@@ -80,18 +82,23 @@ export async function readCache(path: string = defaultCachePath()): Promise<stri
 }
 
 /** Sync cache read for module-load key resolution (silent miss on any failure). */
-export function readCacheSync(path: string = defaultCachePath()): string {
+export function readCacheSync(path: string): string {
   try {
-    const blob = JSON.parse(readFileSync(path, "utf8")) as Partial<MintedCredential>
+    const blob = JSON.parse(readFileSync(path, "utf8")) as Partial<CachedCredential>
     return typeof blob?.apiKey === "string" && blob.apiKey.trim() ? blob.apiKey.trim() : ""
   } catch {
     return ""
   }
 }
 
-export async function writeCache(credentials: MintedCredential, path: string = defaultCachePath()): Promise<void> {
+export async function writeCache(credentials: MintedCredential, path: string): Promise<void> {
+  // Retention minimization: persist only what inference needs. The OAuth
+  // access token has unknown broader scope and nothing reads it back, so it
+  // must never touch disk — sanitize at the sink, whatever callers pass in.
+  const { apiKey, accountId, email } = credentials
+  const cached: CachedCredential = { apiKey, accountId, ...(email ? { email } : {}) }
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, JSON.stringify(credentials, null, 2))
+  await writeFile(path, JSON.stringify(cached, null, 2))
   try {
     await chmod(path, 0o600)
   } catch {

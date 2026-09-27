@@ -15,11 +15,12 @@
  * intentionally distinct from the official `meta` id so both can coexist.
  */
 import { defineSingleProviderPluginEntry, } from "openclaw/plugin-sdk/provider-entry";
-import { ENV_VAR, readCacheSync } from "./src/auth.js";
+import { ENV_VAR, defaultCachePath, explicitToken } from "./src/config.js";
+import { readCacheSync } from "./src/auth.js";
 import { museCodeBaselineModels } from "./src/baseline.models.js";
 // Resolution order: explicit env wins, else the login cache. Silent miss.
-if (!process.env[ENV_VAR]?.trim()) {
-    const cached = readCacheSync();
+if (!explicitToken()) {
+    const cached = readCacheSync(defaultCachePath());
     if (cached)
         process.env[ENV_VAR] = cached;
 }

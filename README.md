@@ -91,6 +91,20 @@ export MUSE_CODE_SUB_TOKEN=<key>
 
 Or run onboarding and choose **Muse Code**.
 
+## Security & credentials
+
+- The cache file (`~/.openclaw/muse-code-sub.json`, override with
+  `MUSE_CODE_SUB_CREDENTIALS`) stores exactly three fields: the
+  subscription `apiKey`, the `accountId`, and the account `email`.
+  The Meta OAuth access token from the login flow is **never written
+  to disk** (kept in memory only for the key exchange, then dropped).
+- The cache file is created with owner-only permissions (`0600` where
+  supported). The login script never prints secret material.
+- Network allowlist: this plugin talks only to `auth.meta.com`
+  (device-code login) and `api.meta.ai` (key minting + inference),
+  both hardcoded — no configurable endpoints, no third parties.
+- Report vulnerabilities privately per [SECURITY.md](./SECURITY.md).
+
 ## Compatibility
 
 - OpenClaw gateway `>=2026.7.1` (built and tested against `2026.9.5`).

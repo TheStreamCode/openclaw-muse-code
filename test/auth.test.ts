@@ -1,10 +1,9 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { CREDENTIALS_ENV_VAR, defaultCachePath } from "../src/config.js";
 import {
-  CREDENTIALS_ENV_VAR,
-  defaultCachePath,
   readCache,
   writeCache,
   deviceAuthorize,
@@ -53,6 +52,19 @@ describe("credential cache", () => {
 
   it("miss resolves empty", async () => {
     expect(await readCache(join(tmpdir(), "muse-auth-absent.json"))).toBe("");
+  });
+
+  it("never persists the OAuth access token", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "muse-auth-"));
+    const path = join(dir, "creds.json");
+    await writeCache(
+      { oauthAccessToken: "dca-secret", apiKey: "LLM|k", accountId: "uid-1", email: "u@e.c" },
+      path,
+    );
+    const raw = readFileSync(path, "utf8");
+    expect(raw).not.toContain("dca-secret");
+    expect(raw).not.toContain("oauthAccessToken");
+    expect(JSON.parse(raw)).toStrictEqual({ apiKey: "LLM|k", accountId: "uid-1", email: "u@e.c" });
   });
 
   it("honors the MUSE_CODE_SUB_CREDENTIALS override", () => {
