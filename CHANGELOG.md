@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-27
+
+### Added
+
+- Live model discovery: the catalog is fetched from `GET {baseUrl}/models`
+  (60s in-memory TTL, only `muse-spark-*` admitted — the endpoint also
+  serves non-chat families such as `sam-*`), so newly published models
+  appear automatically. The static baseline remains as pre-credential
+  discovery and as fallback whenever the live fetch fails.
+  The subscription key is re-resolved on every discovery call, so no
+  gateway restart is needed after the first login.
+
 ## [0.1.1] - 2026-09-27
 
 ### Security

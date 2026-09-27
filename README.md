@@ -33,6 +33,13 @@ plugins can be installed side by side.
 > contributor variants as **selectable** models but never selects them
 > implicitly: the setup default is the standard `muse-spark-1.3`.
 
+Model discovery is **live**: the catalog is fetched from
+`GET {baseUrl}/models` (60s in-memory TTL, only `muse-spark-*` ids
+admitted — other endpoint families such as `sam-*`, `muse-image-*` or
+`muse-voice-*` are not chat models), so newly published models appear
+automatically with no plugin update. The static table above is the
+fallback used before login and whenever the live fetch fails.
+
 ## Install
 
 From ClawHub:
