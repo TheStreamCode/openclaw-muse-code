@@ -1,5 +1,5 @@
 /**
- * Static Muse Spark model catalog.
+ * Static Muse Spark + Muse Wonder model catalog.
  *
  * Hand-maintained (there is no public unauthenticated catalog endpoint for
  * the Meta Model API): model ids and context windows mirror the official
@@ -28,4 +28,20 @@ export const museCodeBaselineModels: MuseCodeBaselineRow[] = [
     context_length: 1048576,
   },
   { id: "muse-spark-1.1", name: "Muse Spark 1.1", context_length: 1048576 },
+  { id: "muse-wonder-1.0", name: "Muse Wonder 1.0", context_length: 1048576 },
+  {
+    id: "muse-wonder-1.0-contributor",
+    name: "Muse Wonder 1.0 Contributor",
+    context_length: 1048576,
+  },
+  {
+    id: "muse-wonder-full-1.0",
+    name: "Muse Wonder Full 1.0",
+    context_length: 1048576,
+  },
+  {
+    id: "muse-wonder-full-1.0-contributor",
+    name: "Muse Wonder Full 1.0 Contributor",
+    context_length: 1048576,
+  },
 ];

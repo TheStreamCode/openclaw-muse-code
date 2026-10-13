@@ -1,7 +1,7 @@
 {
   "name": "@thestreamcode/openclaw-muse-code",
-  "version": "0.2.0",
-  "description": "Muse Spark in OpenClaw billed to the Muse Code monthly subscription (Meta device login, no API key)",
+  "version": "0.3.0",
+  "description": "Muse Spark + Muse Wonder in OpenClaw billed to the Muse Code monthly subscription (Meta device login, no API key)",
   "type": "module",
   "license": "MIT",
   "private": false,
@@ -37,6 +37,7 @@
     "openclaw-plugin",
     "muse-code",
     "muse-spark",
+    "muse-wonder",
     "meta-ai",
     "llm",
     "provider"

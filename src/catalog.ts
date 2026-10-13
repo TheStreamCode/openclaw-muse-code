@@ -13,12 +13,12 @@ export const MODELS_PATH = "/models";
 export const LIVE_CATALOG_TTL_MS = 60_000;
 export const FETCH_TIMEOUT_MS = 8_000;
 
-// Allowlist: this provider serves the Muse Spark chat family. The live
+// Allowlist: this provider serves the Muse Spark + Muse Wonder chat families. The live
 // endpoint also returns other families (sam-*, muse-image-*, muse-voice-*)
 // that are not usable as chat/completions models — a denylist would leak
-// the next such family, so only muse-spark-* is admitted. Anything else
+// the next such family, so only muse-spark-* and muse-wonder-* are admitted. Anything else
 // still resolves through the dynamic resolver if requested explicitly.
-const CHAT_FAMILY_PREFIX = "muse-spark-";
+const CHAT_FAMILY_PREFIXES = ["muse-spark-", "muse-wonder-"];
 
 type ModelsResponse = {
   data?: unknown;
@@ -55,7 +55,7 @@ function parseModelIds(body: unknown): string[] | null {
       );
     })
     .map((row) => row.id)
-    .filter((id) => id.startsWith(CHAT_FAMILY_PREFIX));
+    .filter((id) => CHAT_FAMILY_PREFIXES.some((p) => id.startsWith(p)));
   return ids.length > 0 ? ids : null;
 }
 

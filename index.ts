@@ -1,5 +1,5 @@
 /**
- * Muse Spark model provider plugin for OpenClaw, billed to the Muse Code
+ * Muse Spark + Muse Wonder model provider plugin for OpenClaw, billed to the Muse Code
  * monthly subscription instead of API credits.
  *
  * Authentication is a Meta device-code login performed once via
@@ -37,7 +37,7 @@ if (!process.env[ENV_VAR]?.trim()) {
 const META_BASE_URL = "https://api.meta.ai/v1";
 
 /**
- * Known Muse Spark context window (official catalog: input + output share
+ * Known Muse family context window (official catalog: input + output share
  * the budget). Used as the default when a row omits context_length.
  */
 const MUSE_CONTEXT_WINDOW = 1_048_576;
@@ -59,7 +59,7 @@ export type MuseCodeModelRow = {
 };
 
 /**
- * Maps a Muse Spark baseline row to an OpenClaw model definition.
+ * Maps a Muse Spark / Muse Wonder baseline row to an OpenClaw model definition.
  *
  * Every model uses the Responses API transport. Contributor-tier variants
  * keep working when selected explicitly (see README for the training-data
@@ -170,7 +170,7 @@ export default defineSingleProviderPluginEntry({
   id: "muse-code",
   name: "Muse Code",
   description:
-    "Muse Spark (api.meta.ai) model provider billed to the Muse Code monthly subscription.",
+    "Muse Spark + Muse Wonder (api.meta.ai) model provider billed to the Muse Code monthly subscription.",
   provider: {
     label: "Muse Code",
     docsPath: "/providers/muse-code",

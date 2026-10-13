@@ -1,7 +1,7 @@
 {
   "id": "muse-code",
   "name": "Muse Code",
-  "description": "Muse Spark (api.meta.ai) model provider plugin billed to the Muse Code monthly subscription.",
+  "description": "Muse Spark + Muse Wonder (api.meta.ai) model provider plugin billed to the Muse Code monthly subscription.",
   "providers": ["muse-code"],
   "modelSupport": {
     "modelPrefixes": ["muse-code/"]
@@ -88,6 +88,50 @@
           {
             "id": "muse-spark-1.1",
             "name": "Muse Spark 1.1",
+            "api": "openai-responses",
+            "baseUrl": "https://api.meta.ai/v1",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "contextWindow": 1048576,
+            "maxTokens": 131072,
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          },
+          {
+            "id": "muse-wonder-1.0",
+            "name": "Muse Wonder 1.0",
+            "api": "openai-responses",
+            "baseUrl": "https://api.meta.ai/v1",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "contextWindow": 1048576,
+            "maxTokens": 131072,
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          },
+          {
+            "id": "muse-wonder-1.0-contributor",
+            "name": "Muse Wonder 1.0 Contributor",
+            "api": "openai-responses",
+            "baseUrl": "https://api.meta.ai/v1",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "contextWindow": 1048576,
+            "maxTokens": 131072,
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          },
+          {
+            "id": "muse-wonder-full-1.0",
+            "name": "Muse Wonder Full 1.0",
+            "api": "openai-responses",
+            "baseUrl": "https://api.meta.ai/v1",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "contextWindow": 1048576,
+            "maxTokens": 131072,
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          },
+          {
+            "id": "muse-wonder-full-1.0-contributor",
+            "name": "Muse Wonder Full 1.0 Contributor",
             "api": "openai-responses",
             "baseUrl": "https://api.meta.ai/v1",
             "reasoning": true,

@@ -48,7 +48,7 @@ describe("projectModel", () => {
 });
 
 describe("static baseline (pre-credential discovery)", () => {
-  it("ships the five-model Muse Spark family", () => {
+  it("ships the nine-model Muse Spark + Wonder family", () => {
     const ids = museCodeBaselineModels.map((r) => r.id);
     expect(ids).toEqual([
       "muse-spark-1.3",
@@ -56,6 +56,10 @@ describe("static baseline (pre-credential discovery)", () => {
       "muse-spark-1.2",
       "muse-spark-1.2-contributor",
       "muse-spark-1.1",
+      "muse-wonder-1.0",
+      "muse-wonder-1.0-contributor",
+      "muse-wonder-full-1.0",
+      "muse-wonder-full-1.0-contributor",
     ]);
   });
 
