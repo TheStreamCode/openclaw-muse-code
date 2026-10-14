@@ -13,12 +13,11 @@ export const MODELS_PATH = "/models";
 export const LIVE_CATALOG_TTL_MS = 60_000;
 export const FETCH_TIMEOUT_MS = 8_000;
 
-// Allowlist: this provider serves the Muse Spark chat family. The live
-// endpoint also returns other families (sam-*, muse-image-*, muse-voice-*)
-// that are not usable as chat/completions models — a denylist would leak
-// the next such family, so only muse-spark-* is admitted. Anything else
-// still resolves through the dynamic resolver if requested explicitly.
-const CHAT_FAMILY_PREFIX = "muse-spark-";
+// Dynamic discovery: admit every model id the live account catalog
+// returns, except the endpoint families verified as non-chat
+// (segmentation, image, voice). New chat models appear without a
+// plugin update; only a brand-new non-chat family needs an entry here.
+const NON_CHAT_PREFIXES = ["sam-", "muse-image-", "muse-voice-"];
 
 type ModelsResponse = {
   data?: unknown;
@@ -55,7 +54,7 @@ function parseModelIds(body: unknown): string[] | null {
       );
     })
     .map((row) => row.id)
-    .filter((id) => id.startsWith(CHAT_FAMILY_PREFIX));
+    .filter((id) => !NON_CHAT_PREFIXES.some((p) => id.startsWith(p)));
   return ids.length > 0 ? ids : null;
 }
 

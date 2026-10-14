@@ -1,6 +1,6 @@
 # openclaw-muse-code
 
-Muse Spark in OpenClaw, billed to the **Muse Code monthly subscription**
+Muse models in OpenClaw, billed to the **Muse Code monthly subscription**
 instead of API credits. Meta device-code login, no API key, no
 third-party CLI.
 
@@ -34,9 +34,9 @@ plugins can be installed side by side.
 > implicitly: the setup default is the standard `muse-spark-1.3`.
 
 Model discovery is **live**: the catalog is fetched from
-`GET {baseUrl}/models` (60s in-memory TTL, only `muse-spark-*` ids
-admitted — other endpoint families such as `sam-*`, `muse-image-*` or
-`muse-voice-*` are not chat models), so newly published models appear
+`GET {baseUrl}/models` (60s in-memory TTL) and every returned model id
+is served except the endpoint families verified as non-chat (`sam-*`,
+`muse-image-*`, `muse-voice-*`), so newly published models appear
 automatically with no plugin update. The static table above is the
 fallback used before login and whenever the live fetch fails.
 
