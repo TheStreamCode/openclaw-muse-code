@@ -1,7 +1,7 @@
 {
   "id": "muse-code",
   "name": "Muse Code",
-  "description": "Muse Spark (api.meta.ai) model provider plugin billed to the Muse Code monthly subscription.",
+  "description": "Muse models (api.meta.ai) model provider plugin billed to the Muse Code monthly subscription.",
   "providers": ["muse-code"],
   "modelSupport": {
     "modelPrefixes": ["muse-code/"]

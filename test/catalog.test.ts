@@ -38,6 +38,9 @@ const LIVE_OK = {
   data: [
     { id: "muse-spark-1.3" },
     { id: "muse-spark-9.9" },
+    { id: "muse-wonder-1.0" },
+    { id: "muse-wonder-full-1.0" },
+    { id: "muse-nova-9.9" },
     { id: "sam-3.1" },
     { id: "muse-image-1.0" },
     { id: "muse-voice-2.0" },
@@ -45,11 +48,14 @@ const LIVE_OK = {
 };
 
 describe("fetchLiveModelIds", () => {
-  it("admits only the muse-spark chat family", async () => {
+  it("admits the live catalog except non-chat families", async () => {
     stubFetch(() => ({ status: 200, body: LIVE_OK }));
     expect(await fetchLiveModelIds("https://x.test/v1", "k")).toEqual([
       "muse-spark-1.3",
       "muse-spark-9.9",
+      "muse-wonder-1.0",
+      "muse-wonder-full-1.0",
+      "muse-nova-9.9",
     ]);
   });
 
@@ -93,21 +99,21 @@ describe("fetchLiveModelIds", () => {
 describe("getLiveModelIdsCached", () => {
   it("serves warm entries without refetching", async () => {
     const counter = stubFetch(() => ({ status: 200, body: LIVE_OK }));
-    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(2);
-    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(2);
+    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(5);
+    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(5);
     expect(counter.calls()).toBe(1);
   });
 
   it("refetches after expiry", async () => {
     const counter = stubFetch(() => ({ status: 200, body: LIVE_OK }));
-    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 0)).toHaveLength(2);
-    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(2);
+    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 0)).toHaveLength(5);
+    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(5);
     expect(counter.calls()).toBe(2);
   });
 
   it("clears stale entries on failure", async () => {
     stubFetch(() => ({ status: 200, body: LIVE_OK }));
-    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(2);
+    expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(5);
     stubFetch(() => ({ status: 500, body: {} }));
     __clearLiveCatalogCache();
     expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toBeNull();

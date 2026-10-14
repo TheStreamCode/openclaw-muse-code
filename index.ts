@@ -1,5 +1,5 @@
 /**
- * Muse Spark model provider plugin for OpenClaw, billed to the Muse Code
+ * Muse model provider plugin for OpenClaw, billed to the Muse Code
  * monthly subscription instead of API credits.
  *
  * Authentication is a Meta device-code login performed once via
@@ -170,7 +170,7 @@ export default defineSingleProviderPluginEntry({
   id: "muse-code",
   name: "Muse Code",
   description:
-    "Muse Spark (api.meta.ai) model provider billed to the Muse Code monthly subscription.",
+    "Muse models (api.meta.ai) model provider billed to the Muse Code monthly subscription.",
   provider: {
     label: "Muse Code",
     docsPath: "/providers/muse-code",
