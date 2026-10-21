@@ -18,11 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accounts cannot serve the previous account's model list.
 - Login argument parsing moved to `src/login-args.ts` and is covered by tests.
 
-### Documentation
+### Changed
 
-- Added `AUTH_CONTRACT.md` and `src/auth.ts` pins the device-flow contract.
+- Added `AUTH_CONTRACT.md`; `src/auth.ts` pins the device-flow contract.
 - Documented that OpenClaw resolves the provider key from the process
   environment and that an explicit value wins over the cache.
+
+## [0.3.0] - 2026-10-14
+
+### Added
+
+- Live discovery now serves every model id returned by the account catalog except
+  the endpoint families verified as non-chat (`sam-*`, `muse-image-*`,
+  `muse-voice-*`), so newly published chat models appear with no plugin update.
 
 ## [0.2.0] - 2026-09-27
 
