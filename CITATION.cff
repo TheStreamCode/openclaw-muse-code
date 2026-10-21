@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "openclaw-muse-code"
+version: 0.4.0
+date-released: "2026-10-21"
+url: "https://github.com/TheStreamCode/openclaw-muse-code"
+repository-code: "https://github.com/TheStreamCode/openclaw-muse-code"
+license: MIT
+abstract: >-
+  Unofficial OpenClaw provider plugin that serves Meta Muse models billed to a
+  Muse Code monthly subscription through a one-time Meta device login, with an
+  owner-only credential cache.
+keywords:
+  - llm
+  - meta-ai
+  - muse-code
+  - muse-spark
+  - openclaw
+  - openclaw-plugin
+  - provider
+authors:
+  - family-names: Gasperini
+    given-names: Michael
+    affiliation: Mikesoft
