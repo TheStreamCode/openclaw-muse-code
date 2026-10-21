@@ -4,6 +4,12 @@ Muse models in OpenClaw, billed to the **Muse Code monthly subscription**
 instead of API credits. Meta device-code login, no API key, no
 third-party CLI.
 
+> **Unofficial and experimental.** This plugin uses a Muse Code subscription
+> credential from OpenClaw. Meta's terms limit that credential to Muse Code, so
+> this use may not be supported and Meta may suspend or revoke accounts or
+> credentials. Use it at your own risk; the authors cannot recover an account.
+> Read [DISCLAIMER.md](DISCLAIMER.md) before installing.
+
 ## Why this exists
 
 The official [`@openclaw/meta-provider`](https://clawhub.ai) plugin serves
@@ -107,10 +113,18 @@ Or run onboarding and choose **Muse Code**.
   to disk** (kept in memory only for the key exchange, then dropped).
 - The cache file is created with owner-only permissions (`0600` where
   supported). The login script never prints secret material.
+- OpenClaw resolves API-key providers from the process environment, so the
+  plugin exports the cached key as `MUSE_CODE_SUB_TOKEN` and refreshes it when
+  the cache changes. An explicit `MUSE_CODE_SUB_TOKEN` always wins and is
+  never overwritten.
 - Network allowlist: this plugin talks only to `auth.meta.com`
   (device-code login) and `api.meta.ai` (key minting + inference),
   both hardcoded — no configurable endpoints, no third parties.
 - Report vulnerabilities privately per [SECURITY.md](./SECURITY.md).
+
+To remove access, delete `~/.openclaw/muse-code-sub.json` (or the path in
+`MUSE_CODE_SUB_CREDENTIALS`); run `muse logout` if you also want to clear the
+Muse Code CLI session.
 
 ## Compatibility
 
@@ -150,5 +164,6 @@ build, unit tests, and a freshness check that fails when the committed
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). Device-flow parameters are compatible with
+MIT — see [LICENSE](./LICENSE). The software is provided "as is"; see
+[DISCLAIMER.md](./DISCLAIMER.md) for the risk notice and liability terms. Device-flow parameters are compatible with
 the published behavior of oh-my-pi (MIT; see [NOTICE](./NOTICE)).

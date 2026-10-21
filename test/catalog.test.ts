@@ -6,8 +6,8 @@ import {
   __clearLiveCatalogCache,
   fetchLiveModelIds,
   getLiveModelIdsCached,
-  resolveKey,
 } from "../src/catalog.js";
+import { __resetKeyStateForTests, resolveKey } from "../src/key.js";
 import { CREDENTIALS_ENV_VAR, ENV_VAR } from "../src/config.js";
 
 type Handler = (url: string, options?: unknown) => { status: number; body: unknown };
@@ -27,6 +27,7 @@ const savedEnv = { ...process.env };
 afterEach(() => {
   vi.unstubAllGlobals();
   __clearLiveCatalogCache();
+  __resetKeyStateForTests();
   delete process.env[ENV_VAR];
   delete process.env[CREDENTIALS_ENV_VAR];
   for (const [key, value] of Object.entries(savedEnv)) {
@@ -102,6 +103,13 @@ describe("getLiveModelIdsCached", () => {
     expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(5);
     expect(await getLiveModelIdsCached("https://x.test/v1", "k", 60_000)).toHaveLength(5);
     expect(counter.calls()).toBe(1);
+  });
+
+  it("does not reuse a warm catalog across different keys", async () => {
+    const counter = stubFetch(() => ({ status: 200, body: LIVE_OK }));
+    expect(await getLiveModelIdsCached("https://x.test/v1", "key-a", 60_000)).toHaveLength(5);
+    expect(await getLiveModelIdsCached("https://x.test/v1", "key-b", 60_000)).toHaveLength(5);
+    expect(counter.calls()).toBe(2);
   });
 
   it("refetches after expiry", async () => {

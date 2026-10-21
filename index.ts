@@ -25,13 +25,12 @@ import type {
 import type { ProviderRuntimeModel } from "openclaw/plugin-sdk/plugin-entry";
 import { ENV_VAR } from "./src/config.js";
 import { getLiveModelIdsCached, resolveKey } from "./src/catalog.js";
+import { syncEnvFromCache } from "./src/key.js";
 import { museCodeBaselineModels } from "./src/baseline.models.js";
 
-// Resolution order: explicit env wins, else the login cache. Silent miss.
-if (!process.env[ENV_VAR]?.trim()) {
-  const cached = resolveKey();
-  if (cached) process.env[ENV_VAR] = cached;
-}
+// OpenClaw resolves the provider key from MUSE_CODE_SUB_TOKEN. Keep that env
+// value aligned with the login cache without overwriting an explicit value.
+syncEnvFromCache();
 
 /** Meta Model API base URL for Responses API traffic. */
 const META_BASE_URL = "https://api.meta.ai/v1";
@@ -113,8 +112,8 @@ export function providerFromRows(rows: MuseCodeModelRow[]): ModelProviderConfig 
 }
 
 async function buildProvider(): Promise<ModelProviderConfig> {
-  // Live first (TTL-cached, key re-resolved per call so no gateway restart
-  // is needed after the first login), static baseline as fallback.
+  // Live first (TTL-cached, key re-resolved per call so a cache refresh is
+  // picked up), static baseline as fallback.
   const key = resolveKey();
   if (key) {
     const live = await getLiveModelIdsCached(META_BASE_URL, key).catch(() => null);

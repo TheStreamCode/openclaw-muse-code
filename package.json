@@ -1,7 +1,7 @@
 {
   "name": "@thestreamcode/openclaw-muse-code",
-  "version": "0.3.0",
-  "description": "Muse models in OpenClaw billed to the Muse Code monthly subscription (Meta device login, no API key)",
+  "version": "0.4.0",
+  "description": "Unofficial and experimental: Muse models in OpenClaw using a Muse Code subscription credential. May conflict with Meta's terms; use at your own risk. See DISCLAIMER.md.",
   "type": "module",
   "license": "MIT",
   "private": false,
@@ -22,7 +22,9 @@
   "files": [
     "dist",
     "openclaw.plugin.json",
-    "README.md"
+    "README.md",
+    "DISCLAIMER.md",
+    "AUTH_CONTRACT.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

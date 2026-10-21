@@ -15,18 +15,13 @@ import {
   writeCache,
 } from "../dist/src/auth.js";
 import { defaultCachePath } from "../dist/src/config.js";
+import { parseLoginArgs } from "../dist/src/login-args.js";
 
-const args = process.argv.slice(2);
-let cache = null;
-for (let i = 0; i < args.length; i += 1) {
-  if (args[i] === "--cache" && args[i + 1]) {
-    cache = args[i + 1];
-    i += 1;
-  } else if (args[i] === "--help" || args[i] === "-h") {
-    console.log("Usage: node scripts/muse-code-login.mjs [--cache <path>]");
-    console.log(`Default cache: ${defaultCachePath()}`);
-    process.exit(0);
-  }
+const { help, cache } = parseLoginArgs(process.argv.slice(2));
+if (help) {
+  console.log("Usage: node scripts/muse-code-login.mjs [--cache <path>]");
+  console.log(`Default cache: ${defaultCachePath()}`);
+  process.exit(0);
 }
 
 try {

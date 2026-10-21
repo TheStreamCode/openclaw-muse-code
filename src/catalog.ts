@@ -6,8 +6,9 @@
 // non-chat families, and falls back to the static baseline on any failure:
 // missing key, network error, or unexpected shape.
 
-import { defaultCachePath, explicitToken } from "./config.js";
-import { readCacheSync } from "./auth.js";
+import { createHash } from "node:crypto";
+
+export { resolveKey } from "./key.js";
 
 export const MODELS_PATH = "/models";
 export const LIVE_CATALOG_TTL_MS = 60_000;
@@ -24,6 +25,7 @@ type ModelsResponse = {
 };
 
 type CachedEntry = {
+  tokenHash: string;
   ids: string[];
   expiresAt: number;
 };
@@ -35,9 +37,8 @@ export function __clearLiveCatalogCache(): void {
   cache = null;
 }
 
-/** Resolve the subscription key: explicit env wins, else a fresh cache read. */
-export function resolveKey(): string {
-  return explicitToken() || readCacheSync(defaultCachePath());
+function tokenHash(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
 }
 
 function parseModelIds(body: unknown): string[] | null {
@@ -90,12 +91,13 @@ export async function getLiveModelIdsCached(
   apiKey: string,
   ttlMs: number = LIVE_CATALOG_TTL_MS,
 ): Promise<string[] | null> {
-  if (cache && Date.now() < cache.expiresAt) return cache.ids;
+  const hash = tokenHash(apiKey);
+  if (cache && cache.tokenHash === hash && Date.now() < cache.expiresAt) return cache.ids;
   const ids = await fetchLiveModelIds(baseUrl, apiKey);
   if (!ids) {
     cache = null;
     return null;
   }
-  cache = { ids, expiresAt: Date.now() + Math.max(0, ttlMs) };
+  cache = { tokenHash: hash, ids, expiresAt: Date.now() + Math.max(0, ttlMs) };
   return ids;
 }

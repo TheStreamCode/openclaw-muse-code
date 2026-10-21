@@ -12,6 +12,7 @@ export const CLIENT_ID = "1031625952748946";
 export const DEVICE_URL = "https://auth.meta.com/oidc/device/authorization/";
 export const TOKEN_URL = "https://auth.meta.com/oidc/device/token/";
 export const KEY_URL = "https://api.meta.ai/muse-code/key";
+export const AUTH_CONTRACT_VERSION = 1;
 const HEADERS = {
     Accept: "application/json",
     "x-api-version": "1.0.0",

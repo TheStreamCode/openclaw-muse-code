@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
+### Fixed
+
+- The provider env var is now kept in sync with the login cache without
+  overwriting an explicit `MUSE_CODE_SUB_TOKEN`; re-login no longer leaves a
+  stale key in a long-lived process.
+- The live catalog cache is keyed by the subscription key, so switching
+  accounts cannot serve the previous account's model list.
+- Login argument parsing moved to `src/login-args.ts` and is covered by tests.
+
+### Documentation
+
+- Added `AUTH_CONTRACT.md` and `src/auth.ts` pins the device-flow contract.
+- Documented that OpenClaw resolves the provider key from the process
+  environment and that an explicit value wins over the cache.
+
 ## [0.2.0] - 2026-09-27
 
 ### Added

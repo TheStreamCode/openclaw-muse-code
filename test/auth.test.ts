@@ -4,6 +4,11 @@ import { join } from "node:path";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { CREDENTIALS_ENV_VAR, defaultCachePath } from "../src/config.js";
 import {
+  AUTH_CONTRACT_VERSION,
+  CLIENT_ID,
+  DEVICE_URL,
+  KEY_URL,
+  TOKEN_URL,
   readCache,
   writeCache,
   deviceAuthorize,
@@ -122,5 +127,15 @@ describe("mint key", () => {
       body: { require_payment: true, action_url: "https://example.test/pay" },
     }));
     await expect(mintKey("dca-x")).rejects.toThrow(/required.*https:\/\/example\.test\/pay/);
+  });
+});
+
+describe("auth contract", () => {
+  it("is pinned to the values documented in AUTH_CONTRACT.md", () => {
+    expect(AUTH_CONTRACT_VERSION).toBe(1);
+    expect(CLIENT_ID).toBe("1031625952748946");
+    expect(DEVICE_URL).toBe("https://auth.meta.com/oidc/device/authorization/");
+    expect(TOKEN_URL).toBe("https://auth.meta.com/oidc/device/token/");
+    expect(KEY_URL).toBe("https://api.meta.ai/muse-code/key");
   });
 });

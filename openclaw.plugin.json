@@ -1,7 +1,7 @@
 {
   "id": "muse-code",
   "name": "Muse Code",
-  "description": "Muse models (api.meta.ai) model provider plugin billed to the Muse Code monthly subscription.",
+  "description": "Unofficial and experimental: Muse models in OpenClaw using a Muse Code subscription credential. May conflict with Meta's terms; use at your own risk.",
   "providers": ["muse-code"],
   "modelSupport": {
     "modelPrefixes": ["muse-code/"]
@@ -23,12 +23,12 @@
       "provider": "muse-code",
       "method": "api-key",
       "choiceId": "muse-code-subscription-key",
-      "choiceLabel": "Muse Code subscription key",
+      "choiceLabel": "Muse Code subscription key (unofficial)",
       "groupId": "muse-code",
       "groupLabel": "Muse Code",
       "cliFlag": "--muse-code-sub-token",
       "cliOption": "--muse-code-sub-token <key>",
-      "cliDescription": "Muse Code subscription key (Meta device login)"
+      "cliDescription": "Unofficial Muse Code subscription key (Meta device login); may conflict with Meta's terms"
     }
   ],
   "configSchema": {
