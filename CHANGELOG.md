@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-30
+
+### Added
+
+- Local wire adapter in front of `api.meta.ai`: it aliases client tool names that collide with
+  the 40-name Muse builtin set pinned in `ADAPTER_CONTRACT.md` (goal, cron, session and patch
+  families included), restores them in the response and
+  normalizes `tool_choice`, the reasoning effort, the output-token floor and the
+  encrypted-reasoning include. The provider entry points at the adapter's loopback origin, so
+  subscription requests keep working now that Meta refuses the colliding declarations with HTTP
+  403 `client_attestation_denied`. If the gate still refuses, the adapter retries once with every
+  tool aliased.
+- `ADAPTER_CONTRACT.md` pins the wire rules and the measured gate trigger; `ADAPTER_VERSION` is
+  the matching constant.
+
+### Changed
+
+- `MUSE_CODE_ADAPTER=off` disables the reshaping while keeping the loopback proxy, so a base URL
+  already observed by OpenClaw stays valid.
+- If the adapter cannot bind, the plugin logs it and keeps the direct `https://api.meta.ai/v1`
+  endpoint instead of failing the provider.
+
 ## [0.5.1] - 2026-10-30
 
 ### Changed

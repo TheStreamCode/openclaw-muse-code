@@ -1,12 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_MODEL_ID,
+  META_BASE_URL,
+  __setAdapterFactoryForTests,
+  ensureMuseCodeAdapter,
+  museCodeBaseUrl,
   projectModel,
   providerFromRows,
   resolveMuseCodeDynamicModel,
 } from "../index.js";
 import { museCodeBaselineModels } from "../src/baseline.models.js";
 import manifest from "../openclaw.plugin.json";
+
+/** Loopback origin the host would receive while the adapter is running. */
+const ADAPTER_BASE_URL = "http://127.0.0.1:43219/v1";
+
+beforeEach(() => {
+  __setAdapterFactoryForTests();
+});
 
 describe("projectModel", () => {
   it("returns null for invalid rows", () => {
@@ -19,7 +30,7 @@ describe("projectModel", () => {
     const m = projectModel({ id: "muse-spark-1.3", context_length: 1048576 });
     expect(m).not.toBeNull();
     expect(m?.api).toBe("openai-responses");
-    expect(m?.baseUrl).toBe("https://api.meta.ai/v1");
+    expect(m?.baseUrl).toBe(META_BASE_URL);
     expect(m?.input).toEqual(["text", "image"]);
     expect(m?.reasoning).toBe(true);
     expect(m?.cost).toEqual({
@@ -62,7 +73,7 @@ describe("static baseline (pre-credential discovery)", () => {
   it("projects the baseline into a provider config", () => {
     const cfg = providerFromRows(museCodeBaselineModels);
     expect(cfg.models.length).toBe(museCodeBaselineModels.length);
-    expect(cfg.baseUrl).toBe("https://api.meta.ai/v1");
+    expect(cfg.baseUrl).toBe(META_BASE_URL);
     expect(cfg.api).toBe("openai-responses");
     expect(cfg.models.every((m) => m.maxTokens <= 131072)).toBe(true);
   });
@@ -82,7 +93,7 @@ describe("resolveMuseCodeDynamicModel", () => {
     expect(m?.name).toBe("Muse Spark 1.3");
     expect(m?.provider).toBe("muse-code");
     expect(m?.api).toBe("openai-responses");
-    expect(m?.baseUrl).toBe("https://api.meta.ai/v1");
+    expect(m?.baseUrl).toBe(META_BASE_URL);
     expect(m?.maxTokens).toBeLessThanOrEqual(131072);
   });
 
@@ -112,11 +123,64 @@ describe("contributor-tier safeguard", () => {
   });
 });
 
+describe("adapter base URL", () => {
+  it("uses the direct endpoint until the adapter is running", () => {
+    expect(museCodeBaseUrl()).toBe(META_BASE_URL);
+  });
+
+  it("routes the provider, its models and dynamic resolution to the adapter", async () => {
+    __setAdapterFactoryForTests(async () => ({
+      baseUrl: ADAPTER_BASE_URL,
+      close: async () => {},
+    }));
+    await ensureMuseCodeAdapter();
+    expect(museCodeBaseUrl()).toBe(ADAPTER_BASE_URL);
+
+    const cfg = providerFromRows(museCodeBaselineModels);
+    expect(cfg.baseUrl).toBe(ADAPTER_BASE_URL);
+    expect(cfg.models.every((model) => model.baseUrl === ADAPTER_BASE_URL)).toBe(true);
+
+    expect(projectModel({ id: "muse-spark-1.3" })?.baseUrl).toBe(ADAPTER_BASE_URL);
+    expect(
+      resolveMuseCodeDynamicModel({ provider: "muse-code", modelId: "muse-spark-1.3" })?.baseUrl,
+    ).toBe(ADAPTER_BASE_URL);
+  });
+
+  it("falls back to the direct endpoint when the adapter cannot bind", async () => {
+    const warnings: string[] = [];
+    __setAdapterFactoryForTests(async () => {
+      throw new Error("EADDRINUSE");
+    });
+    expect(
+      await ensureMuseCodeAdapter({ warn: (message: string) => warnings.push(message) }),
+    ).toBeUndefined();
+    expect(museCodeBaseUrl()).toBe(META_BASE_URL);
+    expect(providerFromRows(museCodeBaselineModels).baseUrl).toBe(META_BASE_URL);
+    expect(warnings.join(" ")).toContain("using https://api.meta.ai/v1");
+  });
+
+  it("starts a single adapter instance", async () => {
+    let starts = 0;
+    __setAdapterFactoryForTests(async () => {
+      starts += 1;
+      return { baseUrl: ADAPTER_BASE_URL, close: async () => {} };
+    });
+    const first = await ensureMuseCodeAdapter();
+    const second = await ensureMuseCodeAdapter();
+    expect(starts).toBe(1);
+    expect(second).toBe(first);
+  });
+});
+
 describe("manifest modelCatalog (drift guard)", () => {
+  // The manifest catalog is display metadata: the runtime provider entry is
+  // built by catalog.buildProvider(), which is the value the host routes with.
+  // A loopback port cannot live in a static manifest, so it pins the direct
+  // endpoint and projectModel() defaults to the same value without an adapter.
   const catalog = manifest.modelCatalog.providers["muse-code"];
-  const projected = providerFromRows(museCodeBaselineModels);
 
   it("mirrors the baseline projection model by model", () => {
+    const projected = providerFromRows(museCodeBaselineModels);
     expect(catalog.models.length).toBe(projected.models.length);
     const byId = new Map(projected.models.map((m) => [m.id, m]));
     for (const entry of catalog.models) {
@@ -124,7 +188,7 @@ describe("manifest modelCatalog (drift guard)", () => {
       expect(expected, `manifest model ${entry.id} missing from baseline projection`).toBeDefined();
       expect(entry.name).toBe(expected?.name);
       expect(entry.api).toBe(expected?.api);
-      expect(entry.baseUrl).toBe(expected?.baseUrl);
+      expect(entry.baseUrl).toBe(META_BASE_URL);
       expect(entry.reasoning).toBe(expected?.reasoning);
       expect(entry.input).toEqual(expected?.input);
       expect(entry.contextWindow).toBe(expected?.contextWindow);
@@ -141,7 +205,7 @@ describe("manifest modelCatalog (drift guard)", () => {
 
   it("declares static discovery and the provider-level transport", () => {
     expect(manifest.modelCatalog.discovery["muse-code"]).toBe("static");
-    expect(catalog.baseUrl).toBe("https://api.meta.ai/v1");
+    expect(catalog.baseUrl).toBe(META_BASE_URL);
     expect(catalog.api).toBe("openai-responses");
   });
 });

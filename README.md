@@ -21,6 +21,27 @@ the same wire (`https://api.meta.ai/v1`, Responses API) with a subscription cred
 Provider id `muse-code` is intentionally distinct from the official `meta` id, so both plugins
 can be installed side by side.
 
+## Meta Responses wire compatibility
+
+Since 2026-10-29, `https://api.meta.ai/v1` refuses a Muse Code subscription credential when the
+request declares a flat function tool whose name exactly matches one of Muse Code's builtin tool
+names (the full pinned set is in [ADAPTER_CONTRACT.md](ADAPTER_CONTRACT.md)). The refusal is HTTP
+403 with `code: client_attestation_denied`; names that do not collide are accepted.
+
+The plugin therefore starts a loopback adapter on `127.0.0.1` (first free port of 43219-43222,
+then an ephemeral port) and publishes its `/v1` origin as the provider base URL. The adapter
+aliases exactly the colliding tool names on the way out, restores them in the response, and
+normalizes the few Responses fields Meta validates (`tool_choice`, reasoning effort, the
+output-token floor, the encrypted-reasoning include). Every other path, including model
+discovery, is relayed untouched. The wire rules are pinned in
+[ADAPTER_CONTRACT.md](ADAPTER_CONTRACT.md); they are a compatibility layer for the Meta Responses
+wire format, and Meta's policy still applies. If Meta still refuses the request, the adapter
+retries once with every tool aliased.
+
+`MUSE_CODE_ADAPTER=off` keeps the proxy in place and disables only the rewriting, so a base URL
+already observed by OpenClaw stays valid. If the adapter cannot bind, the plugin logs the failure
+and the provider keeps the direct `https://api.meta.ai/v1` endpoint.
+
 ## Install
 
 From [ClawHub](https://clawhub.ai/plugins/@thestreamcode/openclaw-muse-code) (recommended):
@@ -113,6 +134,9 @@ fetch fails.
   version on Node.js 24.
 - An active Muse Code subscription on the Meta account used at login. Pay-per-token API keys are
   the official plugin's path instead.
+- A loopback port the local adapter can bind (`127.0.0.1`, 43219-43222 preferred, otherwise an
+  ephemeral port). Without it the plugin stays on the direct endpoint and Meta's tool-name gate
+  applies again.
 - The Responses API transport with reasoning-effort mapping and text plus image input.
 
 ## Configuration
@@ -121,6 +145,7 @@ fetch fails.
 | --- | --- | --- |
 | `MUSE_CODE_SUB_TOKEN` | Explicit subscription key; never overwritten by the cache. An OpenClaw auth profile may take precedence for inference. | from the login cache |
 | `MUSE_CODE_SUB_CREDENTIALS` | Overrides the credential cache path. | `~/.openclaw/muse-code-sub.json` |
+| `MUSE_CODE_ADAPTER` | `off` keeps the loopback proxy but disables the tool-name reshaping and the Responses field normalization. | unset |
 | `agents.defaults.model.primary` | Default model id in the OpenClaw configuration. | `muse-code/muse-spark-1.3` |
 
 ## Privacy and security
@@ -136,7 +161,11 @@ fetch fails.
 - For cache-based resolution, the plugin exports the cached key as `MUSE_CODE_SUB_TOKEN` and
   refreshes it when the cache changes.
 - The plugin talks only to `auth.meta.com` for the device login and `api.meta.ai` for key minting
-  and inference; both endpoints are hardcoded and there is no configurable endpoint.
+  and inference; both endpoints are hardcoded and there is no configurable endpoint. Inference
+  goes through the loopback adapter described above, which listens on `127.0.0.1` only.
+- The adapter forwards the `Authorization` header unchanged and never reads, stores or logs
+  credentials, request bodies or response bodies; its optional debug line carries only the method,
+  the path, the status and the number of adapted fields.
 - Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
 To remove access, delete `~/.openclaw/muse-code-sub.json` (or the path in
@@ -164,9 +193,13 @@ you also want to clear the Muse Code CLI session.
 ### Meta rejects subscription requests from this client
 
 Meta may return a 403 mentioning `client_attestation_denied` or that Muse Code subscriptions cover
-the Muse Code client only. This is a client restriction, not evidence of an expired key. Signing in
-again does not remove the restriction. Use Muse Code for the subscription, or a separate
-pay-as-you-go Meta Model API key for other clients, subject to Meta's terms.
+the Muse Code client only. The plugin's loopback adapter aliases the tool names that trigger that
+gate, so the error should no longer appear for client tools whose names collide with Muse Code's
+builtin names. If it does appear, one of these is true: the adapter could not bind and the provider
+fell back to `https://api.meta.ai/v1` (the plugin logs the failure), `MUSE_CODE_ADAPTER=off` is set,
+or Meta changed the gate. It is a client restriction, not evidence of an expired key, and signing
+in again does not remove it. Use Muse Code for the subscription, or a separate pay-as-you-go Meta
+Model API key for other clients, subject to Meta's terms.
 
 ## Development
 

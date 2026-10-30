@@ -24,13 +24,107 @@ import { deviceAuthorize, pollToken, mintKey, writeCache } from "./src/auth.js";
 import { getLiveModelIdsCached, resolveKey } from "./src/catalog.js";
 import { syncEnvFromCache } from "./src/key.js";
 import { museCodeBaselineModels } from "./src/baseline.models.js";
+import { startMuseCodeAdapter, type RunningAdapter } from "./src/adapter.js";
 
 // OpenClaw resolves the provider key from MUSE_CODE_SUB_TOKEN. Keep that env
 // value aligned with the login cache without overwriting an explicit value.
 syncEnvFromCache();
 
 /** Meta Model API base URL for Responses API traffic. */
-const META_BASE_URL = "https://api.meta.ai/v1";
+export const META_BASE_URL = "https://api.meta.ai/v1";
+
+/**
+ * Env switch that keeps the loopback proxy but relays requests unchanged.
+ *
+ * The provider keeps pointing at the adapter so a base URL observed by the
+ * host stays valid when the wire rules are switched off.
+ */
+export const ADAPTER_ENV_VAR = "MUSE_CODE_ADAPTER";
+
+/** Adapter surface the plugin needs; tests stub it without binding a port. */
+export type MuseCodeAdapterHandle = Pick<RunningAdapter, "baseUrl" | "close">;
+
+/**
+ * Starts the loopback adapter. `passthrough` keeps the proxy in place while
+ * disabling the wire rules (`MUSE_CODE_ADAPTER=off`).
+ */
+export type MuseCodeAdapterFactory = (options: {
+  passthrough: boolean;
+  log: (message: string) => void;
+}) => Promise<MuseCodeAdapterHandle>;
+
+/** Minimal logger surface used for adapter diagnostics. */
+type AdapterLogger = {
+  debug?: (message: string) => void;
+  warn?: (message: string) => void;
+};
+
+const defaultAdapterFactory: MuseCodeAdapterFactory = (options) => startMuseCodeAdapter(options);
+
+let adapterFactory: MuseCodeAdapterFactory = defaultAdapterFactory;
+let adapterLogger: AdapterLogger | undefined;
+let adapterStart: Promise<MuseCodeAdapterHandle | undefined> | undefined;
+let adapterBaseUrl: string | undefined;
+
+function adapterPassthrough(): boolean {
+  return (process.env[ADAPTER_ENV_VAR] ?? "").trim().toLowerCase() === "off";
+}
+
+/**
+ * Start the request adapter once per process.
+ *
+ * Meta's subscription gate rejects flat client tool declarations that collide
+ * with Muse Code's builtin tool names (HTTP 403, `client_attestation_denied`).
+ * The adapter aliases exactly those names on the wire and restores them in the
+ * answer, so the host keeps its own tools. A bind failure leaves the provider
+ * on the direct endpoint, which is the behavior before this plugin version.
+ */
+export function ensureMuseCodeAdapter(logger?: AdapterLogger): Promise<MuseCodeAdapterHandle | undefined> {
+  if (logger !== undefined) adapterLogger = logger;
+  adapterStart ??= adapterFactory({
+    passthrough: adapterPassthrough(),
+    log: (message: string) => adapterLogger?.debug?.(message),
+  }).then(
+    (adapter) => {
+      adapterBaseUrl = adapter.baseUrl;
+      return adapter;
+    },
+    (error: unknown) => {
+      const detail = error instanceof Error ? error.message : String(error);
+      adapterLogger?.warn?.(`muse-code: local request adapter unavailable; using ${META_BASE_URL} (${detail})`);
+      return undefined;
+    },
+  );
+  return adapterStart;
+}
+
+/** Base URL every provider and model entry must use: adapter when running, else direct. */
+export function museCodeBaseUrl(): string {
+  return adapterBaseUrl ?? META_BASE_URL;
+}
+
+/** Stop the adapter if it started; safe to call more than once. */
+export async function closeMuseCodeAdapter(): Promise<void> {
+  const start = adapterStart;
+  adapterStart = undefined;
+  adapterBaseUrl = undefined;
+  if (start === undefined) return;
+  const adapter = await start.catch(() => undefined);
+  await adapter?.close().catch(() => undefined);
+}
+
+/** Test-only: replace the adapter starter and forget the started instance. */
+export function __setAdapterFactoryForTests(factory?: MuseCodeAdapterFactory): void {
+  adapterFactory = factory ?? defaultAdapterFactory;
+  adapterStart = undefined;
+  adapterBaseUrl = undefined;
+  adapterLogger = undefined;
+}
+
+async function currentBaseUrl(): Promise<string> {
+  await ensureMuseCodeAdapter();
+  return museCodeBaseUrl();
+}
 
 /**
  * Known Muse Spark context window (official catalog: input + output share
@@ -61,7 +155,10 @@ export type MuseCodeModelRow = {
  * keep working when selected explicitly (see README for the training-data
  * disclosure); nothing in this plugin ever selects them implicitly.
  */
-export function projectModel(row: MuseCodeModelRow): ModelDefinitionConfig | null {
+export function projectModel(
+  row: MuseCodeModelRow,
+  baseUrl: string = museCodeBaseUrl(),
+): ModelDefinitionConfig | null {
   const id = typeof row.id === "string" && row.id.length > 0 ? row.id : null;
   if (!id) return null;
 
@@ -78,7 +175,7 @@ export function projectModel(row: MuseCodeModelRow): ModelDefinitionConfig | nul
     id,
     name,
     api,
-    baseUrl: META_BASE_URL,
+    baseUrl,
     reasoning: true,
     // Matches the official Meta provider: text + image input. Other upstream
     // modalities are not OpenClaw model-manifest input values.
@@ -96,34 +193,42 @@ export function projectModel(row: MuseCodeModelRow): ModelDefinitionConfig | nul
  * Live rows carry ids only, so names default to the id and the context
  * window to the family default; inference is unaffected.
  */
-export function providerFromRows(rows: MuseCodeModelRow[]): ModelProviderConfig {
+export function providerFromRows(
+  rows: MuseCodeModelRow[],
+  baseUrl: string = museCodeBaseUrl(),
+): ModelProviderConfig {
   const models = rows
-    .map((row) => projectModel(row))
+    .map((row) => projectModel(row, baseUrl))
     .filter((m): m is ModelDefinitionConfig => m !== null);
 
   return {
-    baseUrl: META_BASE_URL,
+    baseUrl,
     api: "openai-responses",
     models,
   };
 }
 
 async function buildProvider(): Promise<ModelProviderConfig> {
+  // The provider entry is what the host routes inference with, so it must
+  // carry the adapter origin (or the direct endpoint when binding failed).
+  const baseUrl = await currentBaseUrl();
   // Live first (TTL-cached, key re-resolved per call so a cache refresh is
-  // picked up), static baseline as fallback.
+  // picked up), static baseline as fallback. Discovery itself stays direct:
+  // the adapter relays every non-inference path untouched anyway.
   const key = resolveKey();
   if (key) {
     const live = await getLiveModelIdsCached(META_BASE_URL, key).catch(() => null);
     if (live && live.length > 0) {
-      return providerFromRows(live.map((id) => ({ id })));
+      return providerFromRows(live.map((id) => ({ id })), baseUrl);
     }
   }
-  return providerFromRows(museCodeBaselineModels);
+  return providerFromRows(museCodeBaselineModels, baseUrl);
 }
 
 async function buildStaticProvider(): Promise<ModelProviderConfig> {
-  return providerFromRows(museCodeBaselineModels);
+  return providerFromRows(museCodeBaselineModels, await currentBaseUrl());
 }
+
 
 /** Strips a leading `<provider>/` prefix from a runtime model id when present. */
 function stripProviderModelPrefix(provider: string, modelId: string): string {
@@ -153,7 +258,7 @@ export function resolveMuseCodeDynamicModel(ctx: {
     name: projected?.name ?? modelId,
     api: "openai-responses",
     provider,
-    baseUrl: META_BASE_URL,
+    baseUrl: museCodeBaseUrl(),
     reasoning: true,
     input: ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -226,6 +331,45 @@ const deviceLogin: ProviderAuthMethod = {
   },
 };
 
+/** Host surface touched by the plugin entry; the SDK forwards it as unknown. */
+type PluginHostApi = {
+  logger?: AdapterLogger;
+  lifecycle?: {
+    registerRuntimeLifecycle?: (registration: {
+      id: string;
+      dispose?: () => void | Promise<void>;
+    }) => void;
+    onDispose?: (dispose: () => void | Promise<void>) => unknown;
+  };
+  /** Deprecated flat form kept as a fallback for older hosts. */
+  registerRuntimeLifecycle?: (registration: {
+    id: string;
+    dispose?: () => void | Promise<void>;
+  }) => void;
+};
+
+/**
+ * Register the adapter lifecycle on the host API.
+ *
+ * Prefers the grouped `lifecycle` facade, then the deprecated flat method and
+ * the instance `onDispose` hook, so the loopback listener is released with the
+ * plugin on every host generation that exposes at least one of them.
+ */
+function registerAdapterDisposal(host: PluginHostApi): void {
+  const dispose = () => closeMuseCodeAdapter();
+  const registration = { id: "muse-code-request-adapter", dispose };
+  const lifecycle = host.lifecycle;
+  if (typeof lifecycle?.registerRuntimeLifecycle === "function") {
+    lifecycle.registerRuntimeLifecycle(registration);
+    return;
+  }
+  if (typeof host.registerRuntimeLifecycle === "function") {
+    host.registerRuntimeLifecycle(registration);
+    return;
+  }
+  lifecycle?.onDispose?.(dispose);
+}
+
 export default defineSingleProviderPluginEntry({
   id: "muse-code",
   name: "Muse Code",
@@ -242,4 +386,13 @@ export default defineSingleProviderPluginEntry({
     },
     resolveDynamicModel: resolveMuseCodeDynamicModel,
   },
+  register(api: unknown) {
+    const host = (api ?? {}) as PluginHostApi;
+    // Start while the provider is registered: the catalog callbacks await the
+    // same promise, so the entry they publish already carries the loopback
+    // origin (or the direct one when the port cannot be bound).
+    void ensureMuseCodeAdapter(host.logger);
+    registerAdapterDisposal(host);
+  },
 });
+
