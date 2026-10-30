@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-30
+
+### Changed
+
+- Documented that the onboarding browser-login choice requires OpenClaw 2026.9.5 or newer; older
+  gateways use the device login command.
+
+## [0.5.0] - 2026-10-30
+
+### Added
+
+- Onboarding runs the Meta device-code login and saves an OpenClaw auth profile; the provider no
+  longer asks for an API key.
+
+### Fixed
+
+- The login honours cancellation, offers the URL when the browser cannot open, and no longer echoes
+  token or key endpoint response bodies in errors.
+
+### Changed
+
+- The existing credential cache is still written for older installations; an explicit
+  `MUSE_CODE_SUB_TOKEN` is never overwritten.
+- Documented that Meta can reject subscription requests from clients other than Muse Code.
+
 ## [0.4.0] - 2026-10-21
 
 ### Fixed

@@ -51,6 +51,9 @@ openclaw plugins install --link .
    openclaw models auth login --provider muse-code --method device-code
    ```
 
+   The onboarding choice requires OpenClaw 2026.9.5 or newer. On older gateways, use the
+   `models auth login` command above.
+
 2. Approve the code in the browser. If the browser does not open, use the displayed URL and code.
    OpenClaw saves an auth profile, and the plugin also writes its existing local cache at
    `~/.openclaw/muse-code-sub.json` (override with `MUSE_CODE_SUB_CREDENTIALS`). The key is never
@@ -105,7 +108,9 @@ fetch fails.
 
 ## Requirements
 
-- OpenClaw gateway `>= 2026.7.1`; CI builds and tests against OpenClaw 2026.9.x on Node.js 24.
+- OpenClaw gateway `>= 2026.7.1` for the provider and the device login command. The onboarding
+  browser-login choice requires `>= 2026.9.5`; CI builds and tests against the pinned OpenClaw
+  version on Node.js 24.
 - An active Muse Code subscription on the Meta account used at login. Pay-per-token API keys are
   the official plugin's path instead.
 - The Responses API transport with reasoning-effort mapping and text plus image input.
