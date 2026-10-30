@@ -9,6 +9,7 @@
 import { dirname } from "node:path"
 import { readFileSync } from "node:fs"
 import { readFile, writeFile, mkdir, chmod } from "node:fs/promises"
+import { setTimeout as delay } from "node:timers/promises"
 
 export const CLIENT_ID = "1031625952748946"
 export const DEVICE_URL = "https://auth.meta.com/oidc/device/authorization/"
@@ -23,6 +24,10 @@ const HEADERS: Record<string, string> = {
 const REQUEST_TIMEOUT_MS = 25_000
 const MIN_INTERVAL_S = 1
 const SLOW_DOWN_STEP_S = 5
+const TOKEN_ERRORS = new Set([
+  "access_denied", "expired_token", "invalid_grant", "invalid_client",
+  "unauthorized_client", "unsupported_grant_type", "invalid_request",
+])
 
 export interface DeviceAuthorization {
   device_code: string
@@ -107,20 +112,24 @@ export async function writeCache(credentials: MintedCredential, path: string): P
   }
 }
 
-async function postForm(url: string, params: Record<string, string>): Promise<unknown> {
+function requestSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
+
+async function postForm(url: string, params: Record<string, string>, signal?: AbortSignal): Promise<unknown> {
   const res = await fetch(url, {
     method: "POST",
     headers: { ...HEADERS, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString(),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: requestSignal(signal),
   })
-  const text = await res.text()
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0, 200)}`.trim())
-  return JSON.parse(text)
+  if (!res.ok) throw new Error(`device authorization failed: HTTP ${res.status}`)
+  return res.json()
 }
 
-export async function deviceAuthorize(): Promise<DeviceAuthorization> {
-  const body = (await postForm(DEVICE_URL, { client_id: CLIENT_ID })) as DeviceResponse
+export async function deviceAuthorize(signal?: AbortSignal): Promise<DeviceAuthorization> {
+  const body = (await postForm(DEVICE_URL, { client_id: CLIENT_ID }, signal)) as DeviceResponse
   const { device_code, user_code, verification_uri, interval, expires_in } = body
   if (
     typeof device_code !== "string" ||
@@ -145,11 +154,12 @@ export async function deviceAuthorize(): Promise<DeviceAuthorization> {
   }
 }
 
-export async function pollToken(deviceCode: string, intervalS: number, expiresInS: number): Promise<string> {
+export async function pollToken(deviceCode: string, intervalS: number, expiresInS: number, signal?: AbortSignal): Promise<string> {
   let interval = Math.max(MIN_INTERVAL_S, Number(intervalS) || 5)
   const deadline = Date.now() + Number(expiresInS || 600) * 1000
   let slowDowns = 0
   while (Date.now() < deadline) {
+    signal?.throwIfAborted()
     // The token endpoint answers HTTP errors (e.g. 400 authorization_pending)
     // as part of the normal flow: never throw here, classify instead.
     let body: TokenResponse | null = null
@@ -162,7 +172,7 @@ export async function pollToken(deviceCode: string, intervalS: number, expiresIn
           client_id: CLIENT_ID,
           device_code: deviceCode,
         }).toString(),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: requestSignal(signal),
       })
       try {
         body = (await res.json()) as TokenResponse
@@ -170,8 +180,10 @@ export async function pollToken(deviceCode: string, intervalS: number, expiresIn
         body = null
       }
     } catch {
+      signal?.throwIfAborted()
       body = null
     }
+    signal?.throwIfAborted()
     if (body && !body.error) {
       if (typeof body.access_token !== "string" || !body.access_token) {
         throw new Error("token response has no access_token")
@@ -182,27 +194,29 @@ export async function pollToken(deviceCode: string, intervalS: number, expiresIn
       slowDowns += 1
       interval = Math.max(MIN_INTERVAL_S, interval + SLOW_DOWN_STEP_S)
     } else if (body?.error !== "authorization_pending") {
-      throw new Error(`login failed: ${body?.error || "unreadable token response"}`)
+      const detail = typeof body?.error === "string" && TOKEN_ERRORS.has(body.error)
+        ? body.error
+        : body?.error ? "unknown token error" : "unreadable token response"
+      throw new Error(`login failed: ${detail}`)
     }
     const remaining = deadline - Date.now()
     if (remaining <= 0) break
-    await new Promise<void>((resolve) => setTimeout(resolve, Math.min(interval, remaining) * 1000))
+    await delay(Math.min(interval * 1000, remaining), undefined, { signal })
   }
   throw new Error(
     slowDowns ? "login timed out after slow_down responses" : "login timed out waiting for approval",
   )
 }
 
-export async function mintKey(accessToken: string): Promise<MintedCredential> {
+export async function mintKey(accessToken: string, signal?: AbortSignal): Promise<MintedCredential> {
   const res = await fetch(KEY_URL, {
     method: "POST",
     headers: { ...HEADERS, "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ onboard: true }),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: requestSignal(signal),
   })
-  const text = await res.text()
-  if (!res.ok) throw new Error(`key exchange failed: HTTP ${res.status} ${text.slice(0, 200)}`.trim())
-  const body = JSON.parse(text) as KeyResponse
+  if (!res.ok) throw new Error(`key exchange failed: HTTP ${res.status}`)
+  const body = (await res.json()) as KeyResponse
   if (body.is_subs_active === false) throw new Error("Muse Code subscription is inactive for this account")
   if (typeof body.api_key !== "string" || !body.api_key.trim()) {
     const action = String(body.action_url || body.require_payment_action_url || "").trim()

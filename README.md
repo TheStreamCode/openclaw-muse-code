@@ -6,9 +6,9 @@ Muse models in OpenClaw billed to the Muse Code subscription
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![ClawHub](https://img.shields.io/badge/ClawHub-%40thestreamcode%2Fopenclaw--muse--code-blue)](https://clawhub.ai/plugins/@thestreamcode/openclaw-muse-code)
 
-Provider plugin that serves Meta Muse models in [OpenClaw](https://openclaw.ai) through a one-time
-Meta device login, billed to the Muse Code monthly subscription instead of per-token API credits.
-No API key to copy and no third-party CLI to install.
+Provider plugin for [OpenClaw](https://openclaw.ai) with a Muse Code device login. No API key to
+copy and no third-party CLI to install. A successful login does not guarantee model access: Meta
+may reject subscription requests from clients other than Muse Code.
 
 > **Unofficial and experimental.** This plugin uses a Muse Code subscription credential from
 > OpenClaw. Meta's terms limit that credential to Muse Code, so this use may not be supported and
@@ -16,8 +16,8 @@ No API key to copy and no third-party CLI to install.
 > recover an account. Read [DISCLAIMER.md](DISCLAIMER.md) before installing.
 
 The official [`@openclaw/meta-provider`](https://clawhub.ai) plugin serves the same models over
-the same Meta Model API but bills per-token API credits through `MODEL_API_KEY`. This plugin
-serves the identical wire (`https://api.meta.ai/v1`, Responses API) billed to the subscription.
+the same Meta Model API but bills per-token API credits through `MODEL_API_KEY`. This plugin uses
+the same wire (`https://api.meta.ai/v1`, Responses API) with a subscription credential.
 Provider id `muse-code` is intentionally distinct from the official `meta` id, so both plugins
 can be installed side by side.
 
@@ -45,16 +45,17 @@ openclaw plugins install --link .
 
 ## Quick start
 
-1. Log in once. The script prints a Meta URL and a code, and waits for the key exchange:
+1. Run onboarding and choose **Muse Code browser login**, or start the device login directly:
 
    ```bash
-   npm run login
+   openclaw models auth login --provider muse-code --method device-code
    ```
 
-2. Open the printed URL, enter the code, and approve the login in your browser. The plugin mints a
-   stable, account-bound key and caches it at `~/.openclaw/muse-code-sub.json` (owner-only
-   permissions; override with `MUSE_CODE_SUB_CREDENTIALS`). The key is never printed.
-3. Select the provider in `~/.openclaw/openclaw.json`, or run onboarding and choose **Muse Code**:
+2. Approve the code in the browser. If the browser does not open, use the displayed URL and code.
+   OpenClaw saves an auth profile, and the plugin also writes its existing local cache at
+   `~/.openclaw/muse-code-sub.json` (override with `MUSE_CODE_SUB_CREDENTIALS`). The key is never
+   printed.
+3. Select the provider in `~/.openclaw/openclaw.json`:
 
    ```json5
    {
@@ -66,11 +67,17 @@ openclaw plugins install --link .
    }
    ```
 
-An explicitly configured `MUSE_CODE_SUB_TOKEN` always wins over the cache:
+An explicit `MUSE_CODE_SUB_TOKEN` wins over the local cache when resolving the environment and
+catalog. OpenClaw normally selects a saved auth profile before the environment for inference, so
+after the browser login its profile may take precedence over both. Remove the profile if you need
+OpenClaw to use the environment credential instead:
 
 ```bash
 export MUSE_CODE_SUB_TOKEN=<key>
 ```
+
+The standalone `npm run login` script remains available in a source checkout. It updates the cache
+but not an existing OpenClaw auth profile; use the browser login above to replace that profile.
 
 ## Models
 
@@ -107,26 +114,37 @@ fetch fails.
 
 | Setting | Purpose | Default |
 | --- | --- | --- |
-| `MUSE_CODE_SUB_TOKEN` | Explicit subscription key; never overwritten and always wins over the cache. | from the login cache |
+| `MUSE_CODE_SUB_TOKEN` | Explicit subscription key; never overwritten by the cache. An OpenClaw auth profile may take precedence for inference. | from the login cache |
 | `MUSE_CODE_SUB_CREDENTIALS` | Overrides the credential cache path. | `~/.openclaw/muse-code-sub.json` |
 | `agents.defaults.model.primary` | Default model id in the OpenClaw configuration. | `muse-code/muse-spark-1.3` |
 
 ## Privacy and security
 
+- OpenClaw saves the inference credential in an auth profile. Recent versions can store it in the
+  OpenClaw secret store; older versions store it inline in the profile. The plugin also maintains
+  the cache for existing installs, so reference-only storage mode is not supported by this login.
 - The cache stores exactly three fields: the subscription `apiKey`, the `accountId`, and the
   account `email`. The Meta OAuth access token from the login flow is never written to disk; it is
   kept in memory only for the key exchange and then dropped.
-- The cache is created with owner-only permissions (`0600` where supported), and the login script
+- The cache is created with owner-only permissions (`0600` where supported), and the login flow
   never prints secret material.
-- OpenClaw resolves API-key providers from the process environment, so the plugin exports the
-  cached key as `MUSE_CODE_SUB_TOKEN` and refreshes it when the cache changes.
+- For cache-based resolution, the plugin exports the cached key as `MUSE_CODE_SUB_TOKEN` and
+  refreshes it when the cache changes.
 - The plugin talks only to `auth.meta.com` for the device login and `api.meta.ai` for key minting
   and inference; both endpoints are hardcoded and there is no configurable endpoint.
 - Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
 To remove access, delete `~/.openclaw/muse-code-sub.json` (or the path in
-`MUSE_CODE_SUB_CREDENTIALS`) and restart OpenClaw. Run `muse logout` if you also want to clear the
-Muse Code CLI session.
+`MUSE_CODE_SUB_CREDENTIALS`), unset any explicit `MUSE_CODE_SUB_TOKEN`, and remove the saved
+OpenClaw auth profile. On recent OpenClaw versions, run:
+
+```bash
+openclaw models auth logout muse-code:default
+```
+
+Use `openclaw models auth list` to find a different profile or agent. For older versions, follow the
+host's profile-removal documentation. Restart OpenClaw after removing access. Run `muse logout` if
+you also want to clear the Muse Code CLI session.
 
 ## Troubleshooting
 
@@ -136,7 +154,14 @@ Muse Code CLI session.
 | `Muse Code subscription is required: <url>` | No subscription on the account | Complete checkout at the printed URL |
 | `Login failed: access_denied` | Browser step denied or expired | Re-run login and approve within the expiry window |
 | `login timed out after slow_down responses` | Polling throttled, often VM clock drift | Check the system clock and retry |
-| Provider shows as unconfigured | No environment key and no usable cache | Run `npm run login` or set `MUSE_CODE_SUB_TOKEN` |
+| Provider shows as unconfigured | No auth profile, environment key, or usable cache | Run the browser login above |
+
+### Meta rejects subscription requests from this client
+
+Meta may return a 403 mentioning `client_attestation_denied` or that Muse Code subscriptions cover
+the Muse Code client only. This is a client restriction, not evidence of an expired key. Signing in
+again does not remove the restriction. Use Muse Code for the subscription, or a separate
+pay-as-you-go Meta Model API key for other clients, subject to Meta's terms.
 
 ## Development
 

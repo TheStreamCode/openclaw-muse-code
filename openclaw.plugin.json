@@ -21,14 +21,15 @@
   "providerAuthChoices": [
     {
       "provider": "muse-code",
-      "method": "api-key",
-      "choiceId": "muse-code-subscription-key",
-      "choiceLabel": "Muse Code subscription key (unofficial)",
+      "method": "device-code",
+      "personalAccount": true,
+      "appGuidedAuth": "device-code",
+      "credentialOnly": true,
+      "choiceId": "muse-code-device-code",
+      "choiceLabel": "Muse Code browser login (unofficial)",
+      "choiceHint": "Sign in with your Meta account in a browser",
       "groupId": "muse-code",
-      "groupLabel": "Muse Code",
-      "cliFlag": "--muse-code-sub-token",
-      "cliOption": "--muse-code-sub-token <key>",
-      "cliDescription": "Unofficial Muse Code subscription key (Meta device login); may conflict with Meta's terms"
+      "groupLabel": "Muse Code"
     }
   ],
   "configSchema": {

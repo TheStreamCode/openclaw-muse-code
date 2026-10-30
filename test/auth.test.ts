@@ -105,6 +105,20 @@ describe("poll token", () => {
     stubFetch(() => ({ status: 400, body: { error: "access_denied" } }));
     await expect(pollToken("dc", 0, 600)).rejects.toThrow(/access_denied/);
   });
+
+  it("stops before polling when cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    await expect(pollToken("dc", 1, 600, controller.signal)).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not echo unrecognized token endpoint errors", async () => {
+    stubFetch(() => ({ status: 400, body: { error: "secret-in-response" } }));
+    await expect(pollToken("dc", 1, 600)).rejects.toThrow("login failed: unknown token error");
+  });
 });
 
 describe("mint key", () => {
@@ -127,6 +141,11 @@ describe("mint key", () => {
       body: { require_payment: true, action_url: "https://example.test/pay" },
     }));
     await expect(mintKey("dca-x")).rejects.toThrow(/required.*https:\/\/example\.test\/pay/);
+  });
+
+  it("does not expose the body of a failed exchange", async () => {
+    stubFetch(() => ({ status: 403, body: { error: "secret-in-response" } }));
+    await expect(mintKey("dca-x")).rejects.toThrow("key exchange failed: HTTP 403");
   });
 });
 

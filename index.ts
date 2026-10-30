@@ -2,12 +2,8 @@
  * Muse model provider plugin for OpenClaw, billed to the Muse Code
  * monthly subscription instead of API credits.
  *
- * Authentication is a Meta device-code login performed once via
- * `scripts/muse-code-login.mjs` (or `npm run login`): the flow mints a
- * stable, account-bound inference key cached at
- * `~/.openclaw/muse-code-sub.json`. Resolution order: an explicitly
- * configured `MUSE_CODE_SUB_TOKEN` wins, otherwise the cached key. Any
- * failure is a silent miss (provider simply shows as unconfigured).
+ * Authentication is a Meta device-code login. OpenClaw stores the resulting
+ * credential as an auth profile; a copy is cached for existing installations.
  *
  * Wire: Meta Model API (`https://api.meta.ai/v1`) over the Responses API,
  * same as the official `@openclaw/meta-provider` (which is API-key billed).
@@ -22,8 +18,9 @@ import type {
   ModelDefinitionConfig,
   ModelProviderConfig,
 } from "openclaw/plugin-sdk/provider-model-types";
-import type { ProviderRuntimeModel } from "openclaw/plugin-sdk/plugin-entry";
-import { ENV_VAR } from "./src/config.js";
+import type { ProviderAuthContext, ProviderAuthMethod, ProviderRuntimeModel } from "openclaw/plugin-sdk/plugin-entry";
+import { ENV_VAR, defaultCachePath } from "./src/config.js";
+import { deviceAuthorize, pollToken, mintKey, writeCache } from "./src/auth.js";
 import { getLiveModelIdsCached, resolveKey } from "./src/catalog.js";
 import { syncEnvFromCache } from "./src/key.js";
 import { museCodeBaselineModels } from "./src/baseline.models.js";
@@ -165,6 +162,70 @@ export function resolveMuseCodeDynamicModel(ctx: {
   };
 }
 
+function checkAuth(ctx: ProviderAuthContext): void {
+  ctx.signal?.throwIfAborted();
+  ctx.assertCurrent?.();
+}
+
+const deviceLogin: ProviderAuthMethod = {
+  id: "device-code",
+  label: "Muse Code browser login",
+  hint: "Sign in with your Meta account in a browser",
+  kind: "device_code",
+  wizard: {
+    choiceId: "muse-code-device-code",
+    choiceLabel: "Muse Code browser login (unofficial)",
+    groupId: "muse-code",
+    groupLabel: "Muse Code",
+    methodId: "device-code",
+  },
+  async run(ctx) {
+    checkAuth(ctx);
+    if (ctx.secretInputMode === "ref") {
+      throw new Error("Muse Code login requires a local credential cache and does not support reference-only storage.");
+    }
+    const device = await deviceAuthorize(ctx.signal);
+    const url = device.verification_uri_complete || device.verification_uri;
+    checkAuth(ctx);
+    if (ctx.prompter.deviceCode) {
+      await ctx.prompter.deviceCode({
+        title: "Authorize Muse Code",
+        code: device.user_code,
+        expiresInMinutes: Math.max(1, Math.ceil(device.expires_in / 60)),
+        message: `Open ${url} and approve the code.`,
+      });
+    } else {
+      await ctx.prompter.note(`Open ${url}\nEnter code: ${device.user_code}`, "Authorize Muse Code");
+    }
+    checkAuth(ctx);
+    try {
+      await ctx.openUrl(url);
+    } catch {
+      checkAuth(ctx);
+      await ctx.prompter.note("The browser did not open. Use the URL shown above.", "Muse Code");
+    }
+    checkAuth(ctx);
+    const access = await pollToken(device.device_code, device.interval, device.expires_in, ctx.signal);
+    checkAuth(ctx);
+    const credentials = await mintKey(access, ctx.signal);
+    checkAuth(ctx);
+    await writeCache(credentials, defaultCachePath());
+    syncEnvFromCache();
+    checkAuth(ctx);
+    return {
+      profiles: [{
+        profileId: "muse-code:default",
+        credential: { type: "api_key", provider: "muse-code", key: credentials.apiKey },
+        ...(ctx.secretInputMode === "plaintext" ? {} : {
+          secretStorage: { kind: "store", namePrefix: "MUSE_CODE" },
+        }),
+      }],
+      ...(!ctx.credentialOnly ? { defaultModel: `muse-code/${DEFAULT_MODEL_ID}` } : {}),
+      notes: ["Model access depends on Meta's subscription policy."],
+    };
+  },
+};
+
 export default defineSingleProviderPluginEntry({
   id: "muse-code",
   name: "Muse Code",
@@ -173,18 +234,8 @@ export default defineSingleProviderPluginEntry({
   provider: {
     label: "Muse Code",
     docsPath: "/providers/muse-code",
-    auth: [
-      {
-        methodId: "api-key",
-        label: "Muse Code subscription key",
-        hint: "Subscription key from Meta device login (scripts/muse-code-login.mjs)",
-        optionKey: "museCodeSubToken",
-        flagName: "--muse-code-sub-token",
-        envVar: ENV_VAR,
-        promptMessage: "Enter your Muse Code subscription key (or run scripts/muse-code-login.mjs)",
-        defaultModel: `muse-code/${DEFAULT_MODEL_ID}`,
-      },
-    ],
+    envVars: [ENV_VAR],
+    extraAuth: [deviceLogin],
     catalog: {
       buildProvider,
       buildStaticProvider,
