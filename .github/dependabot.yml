@@ -7,6 +7,7 @@ updates:
       day: "monday"
     labels:
       - "dependencies"
+    open-pull-requests-limit: 5
     groups:
       npm-minor-patch:
         update-types:
@@ -23,6 +24,7 @@ updates:
     commit-message:
       prefix: "chore(actions)"
       include: "scope"
+    open-pull-requests-limit: 5
     groups:
       actions-minor-patch:
         update-types:
