@@ -59,7 +59,8 @@ type AdapterLogger = {
   warn?: (message: string) => void;
 };
 
-const defaultAdapterFactory: MuseCodeAdapterFactory = (options) => startMuseCodeAdapter(options);
+const defaultAdapterFactory: MuseCodeAdapterFactory = (options) =>
+  startMuseCodeAdapter({ ...options, minOutputTokens: 1024 });
 
 let adapterFactory: MuseCodeAdapterFactory = defaultAdapterFactory;
 let adapterLogger: AdapterLogger | undefined;

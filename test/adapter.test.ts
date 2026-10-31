@@ -146,6 +146,22 @@ describe("transformRequestBody", () => {
     expect(notes).toHaveLength(5);
   });
 
+  it("maps thinking-off effort and honors a host output floor", () => {
+    const { body, notes } = transformRequestBody(
+      {
+        model: "muse-spark-1.3",
+        reasoning: { effort: "none" },
+        max_output_tokens: 8,
+      },
+      undefined,
+      { minOutputTokens: 1024 },
+    );
+    expect(body["reasoning"]).toEqual({ effort: "minimal" });
+    expect(body["max_output_tokens"]).toBe(1024);
+    expect(notes).toContain("reasoning.effort none->minimal");
+    expect(notes).toContain("max_output_tokens>=1024");
+  });
+
   it("only normalizes parameters when no name collides", () => {
     const { body, notes } = transformRequestBody({
       model: "muse-spark-1.3",

@@ -76,8 +76,11 @@ rejects it, and bump `ADAPTER_VERSION`.
 2. **`tool_choice`.** Meta accepts only `"auto"`. Any other value (named function, `"none"`,
    `"required"`) is replaced with `"auto"`.
 3. **Reasoning effort.** A top-level `reasoning_effort` string moves to `reasoning.effort`; an
-   explicit `reasoning.effort` already present wins.
-4. **Output floor.** `max_output_tokens` below 16 is raised to 16.
+   explicit `reasoning.effort` already present wins. `none` and `off` map to `minimal`, the lowest
+   level Meta accepts.
+4. **Output floor.** `max_output_tokens` below 16 is raised to 16 by default. The OpenClaw plugin
+   starts its adapter with a 1024-token floor so its connection probe leaves room for the
+   reasoning budget; the shared default stays 16.
 5. **Reasoning replay.** `reasoning.encrypted_content` is appended to `include` when missing, so a
    host that replays provider items can keep the encrypted reasoning item.
 6. **Version header.** `x-api-version: 1.0.0` is added when the host did not set it.

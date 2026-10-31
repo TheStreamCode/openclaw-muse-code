@@ -14,6 +14,12 @@ export const museCodeBaselineModels = [
         name: "Muse Spark 1.3 Contributor",
         context_length: 1048576,
     },
+    { id: "muse-wonder-1.0", name: "Muse Wonder 1.0", context_length: 1048576 },
+    {
+        id: "muse-wonder-1.0-contributor",
+        name: "Muse Wonder 1.0 Contributor",
+        context_length: 1048576,
+    },
     { id: "muse-spark-1.2", name: "Muse Spark 1.2", context_length: 1048576 },
     {
         id: "muse-spark-1.2-contributor",

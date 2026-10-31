@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-31
+
+### Fixed
+
+- The loopback adapter is unref'd, so one-shot CLI commands that load the plugin can exit instead
+  of hanging on the listener.
+- The manifest catalog no longer pins `api.meta.ai`: the host resolves the provider base URL from
+  the runtime entry, which points at the adapter, so inference keeps going through aliasing and
+  normalization.
+- `reasoning.effort: "none"` (OpenClaw's thinking-off level) maps to `minimal` instead of being
+  rejected by Meta.
+- The adapter's output floor is 1024 tokens for OpenClaw, so connection probes are not consumed by
+  the reasoning budget and return text.
+- The static catalog lists `muse-wonder-1.0` and `muse-wonder-1.0-contributor`, so the live models
+  are visible before discovery.
+
+### Documented
+
+- Multi-agent gateways need one
+  `models auth login --provider muse-code --method device-code --agent <id>` per agent.
+
 ## [0.6.0] - 2026-10-30
 
 ### Added

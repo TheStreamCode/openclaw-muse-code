@@ -29,7 +29,7 @@ export const META_BASE_URL = "https://api.meta.ai/v1";
  * host stays valid when the wire rules are switched off.
  */
 export const ADAPTER_ENV_VAR = "MUSE_CODE_ADAPTER";
-const defaultAdapterFactory = (options) => startMuseCodeAdapter(options);
+const defaultAdapterFactory = (options) => startMuseCodeAdapter({ ...options, minOutputTokens: 1024 });
 let adapterFactory = defaultAdapterFactory;
 let adapterLogger;
 let adapterStart;

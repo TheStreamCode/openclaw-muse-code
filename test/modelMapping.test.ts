@@ -59,11 +59,13 @@ describe("projectModel", () => {
 });
 
 describe("static baseline (pre-credential discovery)", () => {
-  it("ships the five-model Muse Spark family", () => {
+  it("ships the Muse Spark and Wonder families", () => {
     const ids = museCodeBaselineModels.map((r) => r.id);
     expect(ids).toEqual([
       "muse-spark-1.3",
       "muse-spark-1.3-contributor",
+      "muse-wonder-1.0",
+      "muse-wonder-1.0-contributor",
       "muse-spark-1.2",
       "muse-spark-1.2-contributor",
       "muse-spark-1.1",
@@ -174,9 +176,9 @@ describe("adapter base URL", () => {
 
 describe("manifest modelCatalog (drift guard)", () => {
   // The manifest catalog is display metadata: the runtime provider entry is
-  // built by catalog.buildProvider(), which is the value the host routes with.
-  // A loopback port cannot live in a static manifest, so it pins the direct
-  // endpoint and projectModel() defaults to the same value without an adapter.
+  // built by catalog.buildProvider(), which carries the adapter origin and is
+  // the value the host routes with. The manifest must not pin a static base
+  // URL, because that would bypass the loopback adapter.
   const catalog = manifest.modelCatalog.providers["muse-code"];
 
   it("mirrors the baseline projection model by model", () => {
@@ -188,7 +190,7 @@ describe("manifest modelCatalog (drift guard)", () => {
       expect(expected, `manifest model ${entry.id} missing from baseline projection`).toBeDefined();
       expect(entry.name).toBe(expected?.name);
       expect(entry.api).toBe(expected?.api);
-      expect(entry.baseUrl).toBe(META_BASE_URL);
+      expect(entry.baseUrl).toBeUndefined();
       expect(entry.reasoning).toBe(expected?.reasoning);
       expect(entry.input).toEqual(expected?.input);
       expect(entry.contextWindow).toBe(expected?.contextWindow);
@@ -203,9 +205,9 @@ describe("manifest modelCatalog (drift guard)", () => {
     );
   });
 
-  it("declares static discovery and the provider-level transport", () => {
+  it("declares static discovery without pinning a static base URL", () => {
     expect(manifest.modelCatalog.discovery["muse-code"]).toBe("static");
-    expect(catalog.baseUrl).toBe(META_BASE_URL);
+    expect(catalog.baseUrl).toBeUndefined();
     expect(catalog.api).toBe("openai-responses");
   });
 });

@@ -38,6 +38,13 @@ discovery, is relayed untouched. The wire rules are pinned in
 wire format, and Meta's policy still applies. If Meta still refuses the request, the adapter
 retries once with every tool aliased.
 
+The adapter is unref'd, so one-shot CLI commands that load the plugin can exit, and its output
+floor is 1024 tokens for OpenClaw: the connection probe asks for a tiny budget that a reasoning
+turn would otherwise consume before producing text. `reasoning.effort` values `none` and `off`
+map to `minimal`, which is the lowest effort Meta accepts. The static manifest catalog carries
+display metadata only and deliberately omits a base URL, so the host resolves the adapter origin
+from the runtime provider entry instead of pinning `api.meta.ai`.
+
 `MUSE_CODE_ADAPTER=off` keeps the proxy in place and disables only the rewriting, so a base URL
 already observed by OpenClaw stays valid. If the adapter cannot bind, the plugin logs the failure
 and the provider keeps the direct `https://api.meta.ai/v1` endpoint.
@@ -75,6 +82,10 @@ openclaw plugins install --link .
    The onboarding choice requires OpenClaw 2026.9.5 or newer. On older gateways, use the
    `models auth login` command above.
 
+   On a multi-agent Gateway, sign in once per agent with
+   `openclaw models auth login --provider muse-code --method device-code --agent <id>`:
+   credentials do not carry across agents.
+
 2. Approve the code in the browser. If the browser does not open, use the displayed URL and code.
    OpenClaw saves an auth profile, and the plugin also writes its existing local cache at
    `~/.openclaw/muse-code-sub.json` (override with `MUSE_CODE_SUB_CREDENTIALS`). The key is never
@@ -109,6 +120,8 @@ but not an existing OpenClaw auth profile; use the browser login above to replac
 | --- | --- | --- |
 | `muse-code/muse-spark-1.3` | Standard (default) | 1,048,576 |
 | `muse-code/muse-spark-1.3-contributor` | Contributor | 1,048,576 |
+| `muse-code/muse-wonder-1.0` | Standard | 1,048,576 |
+| `muse-code/muse-wonder-1.0-contributor` | Contributor | 1,048,576 |
 | `muse-code/muse-spark-1.2` | Standard | 1,048,576 |
 | `muse-code/muse-spark-1.2-contributor` | Contributor | 1,048,576 |
 | `muse-code/muse-spark-1.1` | Standard | 1,048,576 |

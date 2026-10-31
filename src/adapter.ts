@@ -185,7 +185,11 @@ export interface AdaptedRequest {
  * are preserved untouched. Pass a plan from {@link planToolAliases} to reuse a
  * mapping, for example the full-aliasing retry.
  */
-export function transformRequestBody(body: JsonRecord, plan?: AliasPlan): AdaptedRequest {
+export function transformRequestBody(
+  body: JsonRecord,
+  plan?: AliasPlan,
+  options: { minOutputTokens?: number } = {},
+): AdaptedRequest {
   const next: JsonRecord = { ...body }
   const notes: string[] = []
 
@@ -202,18 +206,30 @@ export function transformRequestBody(body: JsonRecord, plan?: AliasPlan): Adapte
     notes.push("tool_choice=auto")
   }
 
-  const effort = next["reasoning_effort"]
-  if (typeof effort === "string") {
-    const reasoning = isRecord(next["reasoning"]) ? next["reasoning"] : {}
-    next["reasoning"] = { ...reasoning, effort: reasoning["effort"] ?? effort }
-    delete next["reasoning_effort"]
-    notes.push("reasoning_effort->reasoning.effort")
+  const reasoning = isRecord(next["reasoning"]) ? next["reasoning"] : undefined
+  const legacyEffort = next["reasoning_effort"]
+  const effort =
+    typeof reasoning?.["effort"] === "string"
+      ? reasoning["effort"]
+      : typeof legacyEffort === "string"
+        ? legacyEffort
+        : undefined
+  if (effort !== undefined && (legacyEffort !== undefined || effort === "none" || effort === "off")) {
+    // Meta accepts only minimal..max on the reasoning effort; OpenClaw's
+    // thinking-off level arrives as "none" and would otherwise be a 400.
+    const normalized = effort === "none" || effort === "off" ? "minimal" : effort
+    next["reasoning"] = { ...(reasoning ?? {}), effort: normalized }
+    if (legacyEffort !== undefined) delete next["reasoning_effort"]
+    notes.push(normalized !== effort
+      ? `reasoning.effort ${effort}->${normalized}`
+      : "reasoning_effort->reasoning.effort")
   }
 
   const maxOutput = next["max_output_tokens"]
-  if (typeof maxOutput === "number" && maxOutput < 16) {
-    next["max_output_tokens"] = 16
-    notes.push("max_output_tokens>=16")
+  const floor = options.minOutputTokens ?? 16
+  if (typeof maxOutput === "number" && maxOutput < floor) {
+    next["max_output_tokens"] = floor
+    notes.push(`max_output_tokens>=${String(floor)}`)
   }
 
   const include = Array.isArray(next["include"]) ? next["include"] : []
@@ -351,6 +367,12 @@ export interface AdapterOptions {
   readonly log?: (message: string) => void
   /** Disable the wire rules but keep proxying (MUSE_CODE_ADAPTER=off). */
   readonly passthrough?: boolean
+  /**
+   * Lowest `max_output_tokens` sent upstream. The shared floor is 16, but a
+   * host whose connection probe asks for a tiny output needs more room for the
+   * reasoning budget, so it can raise this per adapter instance.
+   */
+  readonly minOutputTokens?: number
 }
 
 /** A running adapter. */
@@ -449,6 +471,7 @@ export async function startMuseCodeAdapter(options: AdapterOptions = {}): Promis
   const passthrough = options.passthrough === true
   const log = options.log ?? (() => {})
   const candidates = options.ports ?? DEFAULT_PORTS
+  const minOutputTokens = options.minOutputTokens ?? 16
 
   let lastError: unknown
   let server: http.Server | undefined
@@ -468,6 +491,9 @@ export async function startMuseCodeAdapter(options: AdapterOptions = {}): Promis
   }
 
   const running = server
+  // The adapter is a background service: it must not keep a one-shot CLI
+  // process alive after the host has finished its work.
+  running.unref()
   running.on("request", (request: IncomingMessage, response: ServerResponse) => {
     void handle(request, response).catch((error: unknown) => {
       log(`muse-code adapter error: ${error instanceof Error ? error.message : String(error)}`)
@@ -499,7 +525,7 @@ export async function startMuseCodeAdapter(options: AdapterOptions = {}): Promis
         const parsed: unknown = JSON.parse(raw.toString("utf8"))
         if (isRecord(parsed)) {
           parsedBody = parsed
-          const adapted = transformRequestBody(parsed)
+          const adapted = transformRequestBody(parsed, undefined, { minOutputTokens })
           body = Buffer.from(JSON.stringify(adapted.body), "utf8")
           reverse = adapted.plan.reverse
           notes.push(...adapted.notes)
@@ -524,7 +550,7 @@ export async function startMuseCodeAdapter(options: AdapterOptions = {}): Promis
       if (probe.includes("client_attestation_denied")) {
         const allPlan = planToolAliases(parsedBody["tools"], { all: true })
         if (allPlan.aliases.size > reverse.size) {
-          const retry = transformRequestBody(parsedBody, allPlan)
+          const retry = transformRequestBody(parsedBody, allPlan, { minOutputTokens })
           reverse = allPlan.reverse
           notes.push(`gate refused; retried with all ${String(allPlan.aliases.size)} tools aliased`)
           upstreamResponse = await send(Buffer.from(JSON.stringify(retry.body), "utf8"))

@@ -169,7 +169,7 @@ function applyAliases(body, plan) {
  * are preserved untouched. Pass a plan from {@link planToolAliases} to reuse a
  * mapping, for example the full-aliasing retry.
  */
-export function transformRequestBody(body, plan) {
+export function transformRequestBody(body, plan, options = {}) {
     const next = { ...body };
     const notes = [];
     const chosen = plan ?? planToolAliases(next["tools"]);
@@ -183,17 +183,29 @@ export function transformRequestBody(body, plan) {
         next["tool_choice"] = "auto";
         notes.push("tool_choice=auto");
     }
-    const effort = next["reasoning_effort"];
-    if (typeof effort === "string") {
-        const reasoning = isRecord(next["reasoning"]) ? next["reasoning"] : {};
-        next["reasoning"] = { ...reasoning, effort: reasoning["effort"] ?? effort };
-        delete next["reasoning_effort"];
-        notes.push("reasoning_effort->reasoning.effort");
+    const reasoning = isRecord(next["reasoning"]) ? next["reasoning"] : undefined;
+    const legacyEffort = next["reasoning_effort"];
+    const effort = typeof reasoning?.["effort"] === "string"
+        ? reasoning["effort"]
+        : typeof legacyEffort === "string"
+            ? legacyEffort
+            : undefined;
+    if (effort !== undefined && (legacyEffort !== undefined || effort === "none" || effort === "off")) {
+        // Meta accepts only minimal..max on the reasoning effort; OpenClaw's
+        // thinking-off level arrives as "none" and would otherwise be a 400.
+        const normalized = effort === "none" || effort === "off" ? "minimal" : effort;
+        next["reasoning"] = { ...(reasoning ?? {}), effort: normalized };
+        if (legacyEffort !== undefined)
+            delete next["reasoning_effort"];
+        notes.push(normalized !== effort
+            ? `reasoning.effort ${effort}->${normalized}`
+            : "reasoning_effort->reasoning.effort");
     }
     const maxOutput = next["max_output_tokens"];
-    if (typeof maxOutput === "number" && maxOutput < 16) {
-        next["max_output_tokens"] = 16;
-        notes.push("max_output_tokens>=16");
+    const floor = options.minOutputTokens ?? 16;
+    if (typeof maxOutput === "number" && maxOutput < floor) {
+        next["max_output_tokens"] = floor;
+        notes.push(`max_output_tokens>=${String(floor)}`);
     }
     const include = Array.isArray(next["include"]) ? next["include"] : [];
     if (!include.includes("reasoning.encrypted_content")) {
@@ -413,6 +425,7 @@ export async function startMuseCodeAdapter(options = {}) {
     const passthrough = options.passthrough === true;
     const log = options.log ?? (() => { });
     const candidates = options.ports ?? DEFAULT_PORTS;
+    const minOutputTokens = options.minOutputTokens ?? 16;
     let lastError;
     let server;
     let port = 0;
@@ -431,6 +444,9 @@ export async function startMuseCodeAdapter(options = {}) {
         throw new Error(`muse-code adapter could not bind a loopback port: ${String(lastError)}`);
     }
     const running = server;
+    // The adapter is a background service: it must not keep a one-shot CLI
+    // process alive after the host has finished its work.
+    running.unref();
     running.on("request", (request, response) => {
         void handle(request, response).catch((error) => {
             log(`muse-code adapter error: ${error instanceof Error ? error.message : String(error)}`);
@@ -460,7 +476,7 @@ export async function startMuseCodeAdapter(options = {}) {
                 const parsed = JSON.parse(raw.toString("utf8"));
                 if (isRecord(parsed)) {
                     parsedBody = parsed;
-                    const adapted = transformRequestBody(parsed);
+                    const adapted = transformRequestBody(parsed, undefined, { minOutputTokens });
                     body = Buffer.from(JSON.stringify(adapted.body), "utf8");
                     reverse = adapted.plan.reverse;
                     notes.push(...adapted.notes);
@@ -484,7 +500,7 @@ export async function startMuseCodeAdapter(options = {}) {
             if (probe.includes("client_attestation_denied")) {
                 const allPlan = planToolAliases(parsedBody["tools"], { all: true });
                 if (allPlan.aliases.size > reverse.size) {
-                    const retry = transformRequestBody(parsedBody, allPlan);
+                    const retry = transformRequestBody(parsedBody, allPlan, { minOutputTokens });
                     reverse = allPlan.reverse;
                     notes.push(`gate refused; retried with all ${String(allPlan.aliases.size)} tools aliased`);
                     upstreamResponse = await send(Buffer.from(JSON.stringify(retry.body), "utf8"));
