@@ -6,48 +6,16 @@ Muse models in OpenClaw billed to the Muse Code subscription
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![ClawHub](https://img.shields.io/badge/ClawHub-%40thestreamcode%2Fopenclaw--muse--code-blue)](https://clawhub.ai/plugins/@thestreamcode/openclaw-muse-code)
 
-Provider plugin for [OpenClaw](https://openclaw.ai) with a Muse Code device login. No API key to
-copy and no third-party CLI to install. A successful login does not guarantee model access: Meta
-may reject subscription requests from clients other than Muse Code.
+Provider plugin for [OpenClaw](https://openclaw.ai): Muse Code device login, no API key, no
+third-party CLI.
 
 > **Unofficial and experimental.** This plugin uses a Muse Code subscription credential from
 > OpenClaw. Meta's terms limit that credential to Muse Code, so this use may not be supported and
 > Meta may suspend or revoke accounts or credentials. Use it at your own risk; the authors cannot
 > recover an account. Read [DISCLAIMER.md](DISCLAIMER.md) before installing.
 
-The official [`@openclaw/meta-provider`](https://clawhub.ai) plugin serves the same models over
-the same Meta Model API but bills per-token API credits through `MODEL_API_KEY`. This plugin uses
-the same wire (`https://api.meta.ai/v1`, Responses API) with a subscription credential.
-Provider id `muse-code` is intentionally distinct from the official `meta` id, so both plugins
-can be installed side by side.
-
-## Meta Responses wire compatibility
-
-Since 2026-10-29, `https://api.meta.ai/v1` refuses a Muse Code subscription credential when the
-request declares a flat function tool whose name exactly matches one of Muse Code's builtin tool
-names (the full pinned set is in [ADAPTER_CONTRACT.md](ADAPTER_CONTRACT.md)). The refusal is HTTP
-403 with `code: client_attestation_denied`; names that do not collide are accepted.
-
-The plugin therefore starts a loopback adapter on `127.0.0.1` (first free port of 43219-43222,
-then an ephemeral port) and publishes its `/v1` origin as the provider base URL. The adapter
-aliases exactly the colliding tool names on the way out, restores them in the response, and
-normalizes the few Responses fields Meta validates (`tool_choice`, reasoning effort, the
-output-token floor, the encrypted-reasoning include). Every other path, including model
-discovery, is relayed untouched. The wire rules are pinned in
-[ADAPTER_CONTRACT.md](ADAPTER_CONTRACT.md); they are a compatibility layer for the Meta Responses
-wire format, and Meta's policy still applies. If Meta still refuses the request, the adapter
-retries once with every tool aliased.
-
-The adapter is unref'd, so one-shot CLI commands that load the plugin can exit, and its output
-floor is 1024 tokens for OpenClaw: the connection probe asks for a tiny budget that a reasoning
-turn would otherwise consume before producing text. `reasoning.effort` values `none` and `off`
-map to `minimal`, which is the lowest effort Meta accepts. The static manifest catalog carries
-display metadata only and deliberately omits a base URL, so the host resolves the adapter origin
-from the runtime provider entry instead of pinning `api.meta.ai`.
-
-`MUSE_CODE_ADAPTER=off` keeps the proxy in place and disables only the rewriting, so a base URL
-already observed by OpenClaw stays valid. If the adapter cannot bind, the plugin logs the failure
-and the provider keeps the direct `https://api.meta.ai/v1` endpoint.
+The official `@openclaw/meta-provider` plugin serves the same models but bills per-token API
+credits through `MODEL_API_KEY`; this plugin bills a subscription instead.
 
 ## Install
 
@@ -57,7 +25,7 @@ From [ClawHub](https://clawhub.ai/plugins/@thestreamcode/openclaw-muse-code) (re
 openclaw plugins install clawhub:@thestreamcode/openclaw-muse-code
 ```
 
-From GitHub (requires the committed `dist/` runtime in the repository):
+From GitHub (ships the committed `dist/` runtime):
 
 ```bash
 openclaw plugins install git:github.com/TheStreamCode/openclaw-muse-code
@@ -86,10 +54,9 @@ openclaw plugins install --link .
    `openclaw models auth login --provider muse-code --method device-code --agent <id>`:
    credentials do not carry across agents.
 
-2. Approve the code in the browser. If the browser does not open, use the displayed URL and code.
-   OpenClaw saves an auth profile, and the plugin also writes its existing local cache at
-   `~/.openclaw/muse-code-sub.json` (override with `MUSE_CODE_SUB_CREDENTIALS`). The key is never
-   printed.
+2. Approve the code in the browser (or use the displayed URL and code). OpenClaw saves an auth
+   profile, and the plugin keeps its local cache at `~/.openclaw/muse-code-sub.json` (override
+   with `MUSE_CODE_SUB_CREDENTIALS`). The key is never printed.
 3. Select the provider in `~/.openclaw/openclaw.json`:
 
    ```json5
@@ -102,56 +69,63 @@ openclaw plugins install --link .
    }
    ```
 
-An explicit `MUSE_CODE_SUB_TOKEN` wins over the local cache when resolving the environment and
-catalog. OpenClaw normally selects a saved auth profile before the environment for inference, so
-after the browser login its profile may take precedence over both. Remove the profile if you need
-OpenClaw to use the environment credential instead:
+A saved OpenClaw auth profile takes precedence over `MUSE_CODE_SUB_TOKEN` and the cache for
+inference; remove the profile to force the environment credential:
 
 ```bash
 export MUSE_CODE_SUB_TOKEN=<key>
 ```
 
-The standalone `npm run login` script remains available in a source checkout. It updates the cache
-but not an existing OpenClaw auth profile; use the browser login above to replace that profile.
+In a source checkout, `npm run login` updates the cache only, not an existing auth profile.
+
+## Features
+
+- **Subscription billing.** Muse models in OpenClaw on the Muse Code subscription: device
+  login, no API key.
+- **Live model catalog.** Discovery fetches `{baseUrl}/models` on a 60-second TTL; the table below
+  is the pre-login fallback.
+- **Wire adapter.** A loopback adapter aliases tool names Meta's client gate rejects and normalizes
+  validated Responses fields ([ADAPTER_CONTRACT.md](ADAPTER_CONTRACT.md)).
+- **Probes that work.** A 1024-token output floor and `none`/`off`-to-`minimal` mapping keep
+  small requests and thinking-off turns accepted.
+- **Side-by-side installs.** Provider id `muse-code` never clashes with the official `meta`
+  provider.
+- **Credential hygiene.** Owner-only cache, secrets never printed, OAuth token never written to
+  disk.
 
 ## Models
 
-| Model | Tier | Context |
-| --- | --- | --- |
-| `muse-code/muse-spark-1.3` | Standard (default) | 1,048,576 |
-| `muse-code/muse-spark-1.3-contributor` | Contributor | 1,048,576 |
-| `muse-code/muse-wonder-1.0` | Standard | 1,048,576 |
-| `muse-code/muse-wonder-1.0-contributor` | Contributor | 1,048,576 |
-| `muse-code/muse-wonder-full-1.0` | Standard | 1,048,576 |
-| `muse-code/muse-wonder-full-1.0-contributor` | Contributor | 1,048,576 |
-| `muse-code/muse-spark-1.2` | Standard | 1,048,576 |
-| `muse-code/muse-spark-1.2-contributor` | Contributor | 1,048,576 |
-| `muse-code/muse-spark-1.1` | Standard | 1,048,576 |
+| Model | Tier |
+| --- | --- |
+| `muse-code/muse-spark-1.3` | Standard (default) |
+| `muse-code/muse-spark-1.3-contributor` | Contributor |
+| `muse-code/muse-wonder-1.0` | Standard |
+| `muse-code/muse-wonder-1.0-contributor` | Contributor |
+| `muse-code/muse-wonder-full-1.0` | Standard |
+| `muse-code/muse-wonder-full-1.0-contributor` | Contributor |
+| `muse-code/muse-spark-1.2` | Standard |
+| `muse-code/muse-spark-1.2-contributor` | Contributor |
+| `muse-code/muse-spark-1.1` | Standard |
+
+All models use a 1,048,576-token context window.
 
 > [!WARNING]
 > Meta's [Terms of Service](https://dev.meta.ai/legal/terms-of-service) distinguish Standard
 > Services from Contributor and Discounted Services. By using Contributor tiers you permit Meta to
-> use submitted and generated content as described in the Terms. Do not submit sensitive,
-> confidential, or personal information to Contributor tiers. This plugin ships contributor
-> variants as selectable models but never selects them implicitly: the setup default is the
-> standard `muse-spark-1.3`.
+> use submitted and generated content as described in the Terms. Never submit sensitive,
+> confidential, or personal information to Contributor tiers; this plugin never selects them
+> implicitly and defaults to standard `muse-spark-1.3`.
 
-Model discovery is live: the catalog is fetched from `GET {baseUrl}/models` with a 60-second
-in-memory TTL, and every returned model id is served except the endpoint families verified as
-non-chat (`sam-*`, `muse-image-*`, `muse-voice-*`). Newly published models appear automatically
-with no plugin update. The table above is the fallback used before login and whenever the live
-fetch fails.
+Discovery excludes the endpoint families verified as non-chat (`sam-*`, `muse-image-*`,
+`muse-voice-*`).
 
 ## Requirements
 
-- OpenClaw gateway `>= 2026.7.1` for the provider and the device login command. The onboarding
-  browser-login choice requires `>= 2026.9.5`; CI builds and tests against the pinned OpenClaw
-  version on Node.js 24.
+- OpenClaw gateway `>= 2026.7.1` (`>= 2026.9.5` for the onboarding browser-login choice).
 - An active Muse Code subscription on the Meta account used at login. Pay-per-token API keys are
   the official plugin's path instead.
-- A loopback port the local adapter can bind (`127.0.0.1`, 43219-43222 preferred, otherwise an
-  ephemeral port). Without it the plugin stays on the direct endpoint and Meta's tool-name gate
-  applies again.
+- A bindable loopback port (`127.0.0.1`, 43219-43222 preferred, else ephemeral); without it
+  the plugin stays on the direct endpoint and the tool-name gate applies again.
 - The Responses API transport with reasoning-effort mapping and text plus image input.
 
 ## Configuration
@@ -165,56 +139,39 @@ fetch fails.
 
 ## Privacy and security
 
-- OpenClaw saves the inference credential in an auth profile. Recent versions can store it in the
-  OpenClaw secret store; older versions store it inline in the profile. The plugin also maintains
-  the cache for existing installs, so reference-only storage mode is not supported by this login.
+- OpenClaw saves the inference credential in an auth profile (secret store or inline). The
+  plugin also maintains its cache, so reference-only storage is not supported.
 - The cache stores exactly three fields: the subscription `apiKey`, the `accountId`, and the
   account `email`. The Meta OAuth access token from the login flow is never written to disk; it is
   kept in memory only for the key exchange and then dropped.
 - The cache is created with owner-only permissions (`0600` where supported), and the login flow
   never prints secret material.
-- For cache-based resolution, the plugin exports the cached key as `MUSE_CODE_SUB_TOKEN` and
-  refreshes it when the cache changes.
-- The plugin talks only to `auth.meta.com` for the device login and `api.meta.ai` for key minting
-  and inference; both endpoints are hardcoded and there is no configurable endpoint. Inference
-  goes through the loopback adapter described above, which listens on `127.0.0.1` only.
-- The adapter forwards the `Authorization` header unchanged and never reads, stores or logs
-  credentials, request bodies or response bodies; its optional debug line carries only the method,
-  the path, the status and the number of adapted fields.
+- The plugin exports the cached key as `MUSE_CODE_SUB_TOKEN` and refreshes it on cache
+  changes.
+- The plugin talks only to hardcoded `auth.meta.com` (device login) and `api.meta.ai` (key minting,
+  inference); inference goes through the loopback adapter on `127.0.0.1` only.
+- The adapter forwards `Authorization` unchanged and never reads, stores or logs credentials
+  or bodies; its debug line carries only method, path, status and adapted-field count.
 - Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
-To remove access, delete `~/.openclaw/muse-code-sub.json` (or the path in
-`MUSE_CODE_SUB_CREDENTIALS`), unset any explicit `MUSE_CODE_SUB_TOKEN`, and remove the saved
-OpenClaw auth profile. On recent OpenClaw versions, run:
-
-```bash
-openclaw models auth logout muse-code:default
-```
-
-Use `openclaw models auth list` to find a different profile or agent. For older versions, follow the
-host's profile-removal documentation. Restart OpenClaw after removing access. Run `muse logout` if
-you also want to clear the Muse Code CLI session.
+To remove access: delete the cache file, unset `MUSE_CODE_SUB_TOKEN`, remove the saved auth
+profile (`models auth logout muse-code:default`; `models auth list` finds others), restart
+OpenClaw, and run `muse logout` for the CLI session.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| `Muse Code subscription is inactive for this account` | Subscription lapsed or wrong account | Renew, or log in with the subscribed account |
-| `Muse Code subscription is required: <url>` | No subscription on the account | Complete checkout at the printed URL |
+| `Muse Code subscription is inactive` (or `required: <url>`) | Subscription lapsed, wrong account, or missing | Renew, check the account, or complete checkout at the printed URL |
 | `Login failed: access_denied` | Browser step denied or expired | Re-run login and approve within the expiry window |
-| `login timed out after slow_down responses` | Polling throttled, often VM clock drift | Check the system clock and retry |
 | Provider shows as unconfigured | No auth profile, environment key, or usable cache | Run the browser login above |
 
 ### Meta rejects subscription requests from this client
 
-Meta may return a 403 mentioning `client_attestation_denied` or that Muse Code subscriptions cover
-the Muse Code client only. The plugin's loopback adapter aliases the tool names that trigger that
-gate, so the error should no longer appear for client tools whose names collide with Muse Code's
-builtin names. If it does appear, one of these is true: the adapter could not bind and the provider
-fell back to `https://api.meta.ai/v1` (the plugin logs the failure), `MUSE_CODE_ADAPTER=off` is set,
-or Meta changed the gate. It is a client restriction, not evidence of an expired key, and signing
-in again does not remove it. Use Muse Code for the subscription, or a separate pay-as-you-go Meta
-Model API key for other clients, subject to Meta's terms.
+Meta may return 403 `client_attestation_denied`: subscriptions cover the Muse Code client only. The
+adapter aliases colliding tool names (retrying once with all aliased), so the error should be gone;
+if it persists, the adapter could not bind, `MUSE_CODE_ADAPTER=off` is set, or Meta changed the
+gate. Use Muse Code or a pay-as-you-go key instead.
 
 ## Development
 
@@ -229,15 +186,13 @@ npm test
 node scripts/smoke.discovery.mjs   # static (pre-credential) and live discovery smoke
 ```
 
-`dist/` is committed because OpenClaw git and package installs require the compiled runtime;
-regenerate it with `npm run build` after any source change. CI runs type-check, build, unit tests,
-and a freshness check that fails when the committed `dist/` does not match a fresh build.
+`dist/` is committed for OpenClaw installs; regenerate it with `npm run build` after any source
+change (CI checks freshness).
 
 ## Support
 
-Usage questions and workflows belong in GitHub Discussions; reproducible defects belong in GitHub
-Issues using the bug report form. See [SUPPORT.md](SUPPORT.md). Problems in OpenClaw or Meta
-themselves belong to their respective projects.
+Usage questions belong in Discussions, reproducible defects in Issues (bug report form). See
+[SUPPORT.md](SUPPORT.md). OpenClaw or Meta problems belong upstream.
 
 ## Contributing
 
@@ -251,6 +206,6 @@ are compatible with the published behavior of oh-my-pi (MIT; see [NOTICE](./NOTI
 
 ---
 
-Maintained by [Michael Gasperini (Mikesoft)](https://mikesoft.it).
+Maintained by Michael Gasperini (Mikesoft).
 If this project is useful to you, consider
 [sponsoring its maintenance](https://github.com/sponsors/TheStreamCode).
