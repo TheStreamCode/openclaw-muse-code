@@ -82,6 +82,26 @@
             "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
           },
           {
+            "id": "muse-wonder-full-1.0",
+            "name": "Muse Wonder Full 1.0",
+            "api": "openai-responses",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "contextWindow": 1048576,
+            "maxTokens": 131072,
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          },
+          {
+            "id": "muse-wonder-full-1.0-contributor",
+            "name": "Muse Wonder Full 1.0 Contributor",
+            "api": "openai-responses",
+            "reasoning": true,
+            "input": ["text", "image"],
+            "contextWindow": 1048576,
+            "maxTokens": 131072,
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          },
+          {
             "id": "muse-spark-1.2",
             "name": "Muse Spark 1.2",
             "api": "openai-responses",

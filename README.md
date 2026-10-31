@@ -122,6 +122,8 @@ but not an existing OpenClaw auth profile; use the browser login above to replac
 | `muse-code/muse-spark-1.3-contributor` | Contributor | 1,048,576 |
 | `muse-code/muse-wonder-1.0` | Standard | 1,048,576 |
 | `muse-code/muse-wonder-1.0-contributor` | Contributor | 1,048,576 |
+| `muse-code/muse-wonder-full-1.0` | Standard | 1,048,576 |
+| `muse-code/muse-wonder-full-1.0-contributor` | Contributor | 1,048,576 |
 | `muse-code/muse-spark-1.2` | Standard | 1,048,576 |
 | `muse-code/muse-spark-1.2-contributor` | Contributor | 1,048,576 |
 | `muse-code/muse-spark-1.1` | Standard | 1,048,576 |

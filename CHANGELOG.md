@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-31
+
+### Fixed
+
+- The static catalog also lists `muse-wonder-full-1.0` and its contributor variant, so it matches
+  the live model list returned for a subscription key.
+
 ## [0.6.1] - 2026-10-31
 
 ### Fixed

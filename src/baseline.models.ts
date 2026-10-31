@@ -27,6 +27,12 @@ export const museCodeBaselineModels: MuseCodeBaselineRow[] = [
     name: "Muse Wonder 1.0 Contributor",
     context_length: 1048576,
   },
+  { id: "muse-wonder-full-1.0", name: "Muse Wonder Full 1.0", context_length: 1048576 },
+  {
+    id: "muse-wonder-full-1.0-contributor",
+    name: "Muse Wonder Full 1.0 Contributor",
+    context_length: 1048576,
+  },
   { id: "muse-spark-1.2", name: "Muse Spark 1.2", context_length: 1048576 },
   {
     id: "muse-spark-1.2-contributor",

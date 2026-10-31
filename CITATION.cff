@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "openclaw-muse-code"
-version: 0.6.1
+version: 0.6.2
 date-released: "2026-10-31"
 url: "https://github.com/TheStreamCode/openclaw-muse-code"
 repository-code: "https://github.com/TheStreamCode/openclaw-muse-code"
