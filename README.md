@@ -1,4 +1,4 @@
-# openclaw-muse-code
+# Muse Spark for OpenClaw
 
 Muse models in OpenClaw billed to the Muse Code subscription
 
@@ -93,7 +93,7 @@ In a source checkout, `npm run login` updates the cache only, not an existing au
 - **Credential hygiene.** Owner-only cache, secrets never printed, OAuth token never written to
   disk.
 
-## Models
+### Models
 
 | Model | Tier |
 | --- | --- |
@@ -206,6 +206,5 @@ are compatible with the published behavior of oh-my-pi (MIT; see [NOTICE](./NOTI
 
 ---
 
-Maintained by Michael Gasperini (Mikesoft).
-If this project is useful to you, consider
-[sponsoring its maintenance](https://github.com/sponsors/TheStreamCode).
+Maintained by [Michael Gasperini (Mikesoft)](https://mikesoft.it).
+If this project is useful to you, consider [sponsoring its maintenance](https://github.com/sponsors/TheStreamCode).
